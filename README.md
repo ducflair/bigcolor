@@ -1,22 +1,5 @@
-<p align="center">
-<strong>Rust CSS Color Parser Library</strong>
-</p>
-
-<p align="center">
-<a href="https://github.com/mazznoer/csscolorparser-rs"><img alt="License" src="https://img.shields.io/crates/l/csscolorparser"></a>
-<a href="https://crates.io/crates/csscolorparser"><img alt="crates.io" src="https://img.shields.io/crates/v/csscolorparser.svg"></a>
-<a href="https://docs.rs/csscolorparser"><img alt="Documentation" src="https://docs.rs/csscolorparser/badge.svg"></a>
-<a href="https://github.com/mazznoer/csscolorparser-rs/actions"><img alt="Build Status" src="https://github.com/mazznoer/csscolorparser-rs/actions/workflows/rust.yml/badge.svg"></a>
-<a href="https://crates.io/crates/csscolorparser"><img alt="Total Downloads" src="https://img.shields.io/crates/d/csscolorparser.svg"></a>
-</p>
-
-<p align="center">
-    <strong>
-        <a href="https://docs.rs/csscolorparser">Documentation</a> • <a href="CHANGELOG.md">Changelog</a> • <a href="#features">Features</a>
-    </strong>
-</p>
-
-<hr>
+Goal: Port [Tinycolor](https://github.com/bgrins/TinyColor/blob/master/npm/tinycolor.js) and combine with the great csscolorparser Rust color parser
+----
 
 [Rust](https://www.rust-lang.org/) library for parsing CSS color string as defined in the W3C's [CSS Color Module Level 4](https://www.w3.org/TR/css-color-4/).
 
