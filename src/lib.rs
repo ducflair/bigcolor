@@ -55,16 +55,16 @@
 //! Add this to your `Cargo.toml`
 //!
 //! ```toml
-//! csscolorparser = "0.7.0"
+//! bigcolor = "x.y.z"
 //! ```
 //!
 //! ## Examples
 //!
-//! Using [`csscolorparser::parse()`](fn.parse.html) function.
+//! Using [`parse()`](fn.parse.html) function to parse a CSS color string.
 //!
 //! ```rust
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let c = csscolorparser::parse("rgb(100%,0%,0%)")?;
+//! let c = bigcolor::parse("rgb(100%,0%,0%)")?;
 //!
 //! assert_eq!(c.to_array(), [1.0, 0.0, 0.0, 1.0]);
 //! assert_eq!(c.to_rgba8(), [255, 0, 0, 255]);
@@ -77,10 +77,10 @@
 //! Using `parse()` method on `&str`.
 //!
 //! ```rust
-//! use csscolorparser::Color;
+//! use bigcolor::BigColor;
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!
-//! let c = "#ff00007f".parse::<Color>()?;
+//! let c = "#ff00007f".parse::<BigColor>()?;
 //!
 //! assert_eq!(c.to_rgba8(), [255, 0, 0, 127]);
 //! assert_eq!(c.to_hex_string(), "#ff00007f");
@@ -95,18 +95,18 @@
 //! ## Optional Features
 //!
 //! * `lab`: Enables parsing `lab()` and `lch()` color format.
-//! * `rust-rgb`: Enables converting from [`rgb`](https://crates.io/crates/rgb) crate types into `Color`.
-//! * `cint`: Enables converting [`cint`](https://crates.io/crates/cint) crate types to and from `Color`.
+//! * `rust-rgb`: Enables converting from [`rgb`](https://crates.io/crates/rgb) crate types into `BigColor`.
+//! * `cint`: Enables converting [`cint`](https://crates.io/crates/cint) crate types to and from `BigColor`.
 //! * `serde`: Enables serializing (into HEX string) and deserializing (from any supported string color format) using [`serde`](https://serde.rs/) framework.
 
-mod color;
 mod parser;
+mod big_color;
 
 #[cfg(feature = "cint")]
 mod cint;
 
-pub use color::Color;
 pub use parser::{parse, ParseColorError};
+pub use big_color::{BigColor, ReadableOptions};
 
 #[cfg(feature = "named-colors")]
 pub use parser::NAMED_COLORS;

@@ -62,7 +62,7 @@ Add this to your `Cargo.toml`
 csscolorparser = "0.7.0"
 ```
 
-## Examples
+## Using the core Color type
 
 Using `csscolorparser::parse()` function.
 
@@ -86,6 +86,40 @@ assert_eq!(c.to_rgba8(), [255, 0, 0, 127]);
 assert_eq!(c.to_hex_string(), "#ff00007f");
 ```
 
+## Using BigColor for advanced color manipulation
+
+BigColor is a flexible interface that combines functionality from TinyColor with csscolorparser, providing additional color manipulation features.
+
+```rust
+use csscolorparser::BigColor;
+
+// Parse any CSS color format
+let color = BigColor::parse("#ff0000")?;
+
+// Convert to peniko::Color
+let peniko_color = color.to_peniko_color();
+
+// Get contrast color
+let contrast = color.get_contrast(true); // true for extreme contrast, false for soft contrast
+
+// Manipulate colors
+let lighter = color.lighten(20);
+let darker = color.darken(20);
+let desaturated = color.desaturate(50);
+let gray = color.grayscale();
+
+// Generate color schemes
+let complement = color.complement();
+let triad = color.triad();
+let tetrad = color.tetrad();
+let analogous = color.analogous(5, 30);
+let monochromatic = color.monochromatic(5);
+
+// Test readability
+let background = BigColor::parse("#ffffff")?;
+let is_readable = color.is_readable_on(&background, None);
+```
+
 ## Features
 
 ### Default
@@ -103,4 +137,5 @@ assert_eq!(c.to_hex_string(), "#ff00007f");
 
 * [csscolorparser](https://github.com/mazznoer/csscolorparser) (Go)
 * [csscolorparser](https://github.com/deanm/css-color-parser-js) (Javascript)
+* [TinyColor](https://github.com/bgrins/TinyColor) (Javascript)
 

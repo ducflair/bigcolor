@@ -1,6 +1,6 @@
 use std::{error, fmt};
 
-use crate::Color;
+use crate::BigColor;
 
 #[cfg(feature = "named-colors")]
 mod named_colors;
@@ -23,6 +23,7 @@ pub enum ParseColorError {
     InvalidOklch,
     InvalidFunction,
     InvalidUnknown,
+    InvalidValue,
 }
 
 impl fmt::Display for ParseColorError {
@@ -41,11 +42,26 @@ impl fmt::Display for ParseColorError {
             Self::InvalidOklch => f.write_str("invalid oklch format"),
             Self::InvalidFunction => f.write_str("invalid color function"),
             Self::InvalidUnknown => f.write_str("invalid unknown format"),
+            Self::InvalidValue => f.write_str("invalid value"),
         }
     }
 }
 
 impl error::Error for ParseColorError {}
+
+// Helper function for from_str_radix to handle ParseIntError
+impl From<std::num::ParseIntError> for ParseColorError {
+    fn from(_: std::num::ParseIntError) -> Self {
+        Self::InvalidHex
+    }
+}
+
+// Add conversion from () to ParseColorError for our internal error handling
+impl From<()> for ParseColorError {
+    fn from(_: ()) -> Self {
+        Self::InvalidValue
+    }
+}
 
 /// Parse CSS color string
 ///
@@ -76,17 +92,17 @@ impl error::Error for ParseColorError {}
 /// # Ok(())
 /// # }
 /// ```
-pub fn parse(s: &str) -> Result<Color, ParseColorError> {
+pub fn parse(s: &str) -> Result<BigColor, ParseColorError> {
     let s = s.trim().to_lowercase();
 
     if s == "transparent" {
-        return Ok(Color::new(0.0, 0.0, 0.0, 0.0));
+        return Ok(BigColor::new(0.0, 0.0, 0.0, 0.0));
     }
 
     // Named colors
     #[cfg(feature = "named-colors")]
     if let Some([r, g, b]) = NAMED_COLORS.get(&*s) {
-        return Ok(Color::from_rgba8(*r, *g, *b, 255));
+        return Ok(BigColor::from_rgba8(*r, *g, *b, 255));
     }
 
     // Hex format
@@ -95,331 +111,379 @@ pub fn parse(s: &str) -> Result<Color, ParseColorError> {
     }
 
     if let (Some(i), Some(s)) = (s.find('('), s.strip_suffix(')')) {
-        let fname = &s[..i].trim_end();
-        let s = &s[i + 1..].replace([',', '/'], " ");
-        let params = s.split_whitespace().collect::<Vec<&str>>();
-        let p_len = params.len();
-
-        match *fname {
-            "rgb" | "rgba" => {
-                if p_len != 3 && p_len != 4 {
-                    return Err(ParseColorError::InvalidRgb);
-                }
-
-                let r = parse_percent_or_255(params[0]);
-                let g = parse_percent_or_255(params[1]);
-                let b = parse_percent_or_255(params[2]);
-
-                let a = if p_len == 4 {
-                    parse_percent_or_float(params[3])
-                } else {
-                    Some((1.0, true))
-                };
-
-                if let (Some((r, r_fmt)), Some((g, g_fmt)), Some((b, b_fmt)), Some((a, _))) =
-                    (r, g, b, a)
-                {
-                    if r_fmt == g_fmt && g_fmt == b_fmt {
-                        return Ok(Color {
-                            r: r.clamp(0.0, 1.0),
-                            g: g.clamp(0.0, 1.0),
-                            b: b.clamp(0.0, 1.0),
-                            a: a.clamp(0.0, 1.0),
-                        });
-                    }
-                }
-
-                return Err(ParseColorError::InvalidRgb);
-            }
-            "hsl" | "hsla" => {
-                if p_len != 3 && p_len != 4 {
-                    return Err(ParseColorError::InvalidHsl);
-                }
-
-                let h = parse_angle(params[0]);
-                let s = parse_percent_or_float(params[1]);
-                let l = parse_percent_or_float(params[2]);
-
-                let a = if p_len == 4 {
-                    parse_percent_or_float(params[3])
-                } else {
-                    Some((1.0, true))
-                };
-
-                if let (Some(h), Some((s, s_fmt)), Some((l, l_fmt)), Some((a, _))) = (h, s, l, a) {
-                    if s_fmt == l_fmt {
-                        return Ok(Color::from_hsla(h, s, l, a));
-                    }
-                }
-
-                return Err(ParseColorError::InvalidHsl);
-            }
-            "hwb" | "hwba" => {
-                if p_len != 3 && p_len != 4 {
-                    return Err(ParseColorError::InvalidHwb);
-                }
-
-                let h = parse_angle(params[0]);
-                let w = parse_percent_or_float(params[1]);
-                let b = parse_percent_or_float(params[2]);
-
-                let a = if p_len == 4 {
-                    parse_percent_or_float(params[3])
-                } else {
-                    Some((1.0, true))
-                };
-
-                if let (Some(h), Some((w, w_fmt)), Some((b, b_fmt)), Some((a, _))) = (h, w, b, a) {
-                    if w_fmt == b_fmt {
-                        return Ok(Color::from_hwba(h, w, b, a));
-                    }
-                }
-
-                return Err(ParseColorError::InvalidHwb);
-            }
-            "hsv" | "hsva" => {
-                if p_len != 3 && p_len != 4 {
-                    return Err(ParseColorError::InvalidHsv);
-                }
-
-                let h = parse_angle(params[0]);
-                let s = parse_percent_or_float(params[1]);
-                let v = parse_percent_or_float(params[2]);
-
-                let a = if p_len == 4 {
-                    parse_percent_or_float(params[3])
-                } else {
-                    Some((1.0, true))
-                };
-
-                if let (Some(h), Some((s, s_fmt)), Some((v, v_fmt)), Some((a, _))) = (h, s, v, a) {
-                    if s_fmt == v_fmt {
-                        return Ok(Color::from_hsva(h, s, v, a));
-                    }
-                }
-
-                return Err(ParseColorError::InvalidHsv);
-            }
-            #[cfg(feature = "lab")]
-            "lab" => {
-                if p_len != 3 && p_len != 4 {
-                    return Err(ParseColorError::InvalidLab);
-                }
-
-                let l = parse_percent_or_float(params[0]);
-                let a = parse_percent_or_float(params[1]);
-                let b = parse_percent_or_float(params[2]);
-
-                let alpha = if p_len == 4 {
-                    parse_percent_or_float(params[3])
-                } else {
-                    Some((1.0, true))
-                };
-
-                if let (Some((l, l_fmt)), Some((a, a_fmt)), Some((b, b_fmt)), Some((alpha, _))) =
-                    (l, a, b, alpha)
-                {
-                    let l = if l_fmt { l * 100.0 } else { l };
-                    let a = if a_fmt {
-                        remap(a, -1.0, 1.0, -125.0, 125.0)
-                    } else {
-                        a
-                    };
-                    let b = if b_fmt {
-                        remap(b, -1.0, 1.0, -125.0, 125.0)
-                    } else {
-                        b
-                    };
-                    return Ok(Color::from_laba(l.max(0.0), a, b, alpha));
-                }
-
-                return Err(ParseColorError::InvalidLab);
-            }
-            #[cfg(feature = "lab")]
-            "lch" => {
-                if p_len != 3 && p_len != 4 {
-                    return Err(ParseColorError::InvalidLch);
-                }
-
-                let l = parse_percent_or_float(params[0]);
-                let c = parse_percent_or_float(params[1]);
-                let h = parse_angle(params[2]);
-
-                let alpha = if p_len == 4 {
-                    parse_percent_or_float(params[3])
-                } else {
-                    Some((1.0, true))
-                };
-
-                if let (Some((l, l_fmt)), Some((c, c_fmt)), Some(h), Some((alpha, _))) =
-                    (l, c, h, alpha)
-                {
-                    let l = if l_fmt { l * 100.0 } else { l };
-                    let c = if c_fmt { c * 150.0 } else { c };
-                    return Ok(Color::from_lcha(
-                        l.max(0.0),
-                        c.max(0.0),
-                        h.to_radians(),
-                        alpha,
-                    ));
-                }
-
-                return Err(ParseColorError::InvalidLch);
-            }
-            "oklab" => {
-                if p_len != 3 && p_len != 4 {
-                    return Err(ParseColorError::InvalidOklab);
-                }
-
-                let l = parse_percent_or_float(params[0]);
-                let a = parse_percent_or_float(params[1]);
-                let b = parse_percent_or_float(params[2]);
-
-                let alpha = if p_len == 4 {
-                    parse_percent_or_float(params[3])
-                } else {
-                    Some((1.0, true))
-                };
-
-                if let (Some((l, _)), Some((a, a_fmt)), Some((b, b_fmt)), Some((alpha, _))) =
-                    (l, a, b, alpha)
-                {
-                    let a = if a_fmt {
-                        remap(a, -1.0, 1.0, -0.4, 0.4)
-                    } else {
-                        a
-                    };
-                    let b = if b_fmt {
-                        remap(b, -1.0, 1.0, -0.4, 0.4)
-                    } else {
-                        b
-                    };
-                    return Ok(Color::from_oklaba(l.max(0.0), a, b, alpha));
-                }
-
-                return Err(ParseColorError::InvalidOklab);
-            }
-            "oklch" => {
-                if p_len != 3 && p_len != 4 {
-                    return Err(ParseColorError::InvalidOklch);
-                }
-
-                let l = parse_percent_or_float(params[0]);
-                let c = parse_percent_or_float(params[1]);
-                let h = parse_angle(params[2]);
-
-                let alpha = if p_len == 4 {
-                    parse_percent_or_float(params[3])
-                } else {
-                    Some((1.0, true))
-                };
-
-                if let (Some((l, _)), Some((c, c_fmt)), Some(h), Some((alpha, _))) =
-                    (l, c, h, alpha)
-                {
-                    let c = if c_fmt { c * 0.4 } else { c };
-                    return Ok(Color::from_oklcha(
-                        l.max(0.0),
-                        c.max(0.0),
-                        h.to_radians(),
-                        alpha,
-                    ));
-                }
-
-                return Err(ParseColorError::InvalidOklch);
-            }
-            _ => {
-                return Err(ParseColorError::InvalidFunction);
+        if i > 0 {
+            let fname = &s[..i];
+            let args = &s[i + 1..];
+            
+            match fname {
+                "rgb" | "rgba" => return parse_rgb(args),
+                "hsl" | "hsla" => return parse_hsl(args),
+                "hwb" | "hwba" => return parse_hwb(args),
+                "hsv" | "hsva" => return parse_hsv(args),
+                "oklab" | "oklaba" => return parse_oklab(args),
+                "oklch" | "oklcha" => return parse_oklch(args),
+                #[cfg(feature = "lab")]
+                "lab" | "laba" => return parse_lab(args),
+                #[cfg(feature = "lab")]
+                "lch" | "lcha" => return parse_lch(args),
+                _ => return Err(ParseColorError::InvalidFunction),
             }
         }
-    }
-
-    // Hex format without prefix '#'
-    if let Ok(c) = parse_hex(&s) {
-        return Ok(c);
     }
 
     Err(ParseColorError::InvalidUnknown)
 }
 
-fn parse_hex(s: &str) -> Result<Color, ParseColorError> {
-    if !s.is_ascii() {
+fn parse_hex(s: &str) -> Result<BigColor, ParseColorError> {
+    let n = s.len();
+
+    if n != 3 && n != 4 && n != 6 && n != 8 {
         return Err(ParseColorError::InvalidHex);
     }
 
-    let n = s.len();
-
-    fn parse_single_digit(digit: &str) -> Result<u8, ParseColorError> {
-        u8::from_str_radix(digit, 16)
-            .map(|n| (n << 4) | n)
-            .map_err(|_| ParseColorError::InvalidHex)
+    if !s.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f')) {
+        return Err(ParseColorError::InvalidHex);
     }
 
-    if n == 3 || n == 4 {
-        let r = parse_single_digit(&s[0..1])?;
-        let g = parse_single_digit(&s[1..2])?;
-        let b = parse_single_digit(&s[2..3])?;
+    let (r, g, b, a) = match n {
+        3 => {
+            let r = u8::from_str_radix(&s[0..1], 16)?;
+            let g = u8::from_str_radix(&s[1..2], 16)?;
+            let b = u8::from_str_radix(&s[2..3], 16)?;
+            (r * 17, g * 17, b * 17, 255)
+        }
+        4 => {
+            let r = u8::from_str_radix(&s[0..1], 16)?;
+            let g = u8::from_str_radix(&s[1..2], 16)?;
+            let b = u8::from_str_radix(&s[2..3], 16)?;
+            let a = u8::from_str_radix(&s[3..4], 16)?;
+            (r * 17, g * 17, b * 17, a * 17)
+        }
+        6 => {
+            let r = u8::from_str_radix(&s[0..2], 16)?;
+            let g = u8::from_str_radix(&s[2..4], 16)?;
+            let b = u8::from_str_radix(&s[4..6], 16)?;
+            (r, g, b, 255)
+        }
+        8 => {
+            let r = u8::from_str_radix(&s[0..2], 16)?;
+            let g = u8::from_str_radix(&s[2..4], 16)?;
+            let b = u8::from_str_radix(&s[4..6], 16)?;
+            let a = u8::from_str_radix(&s[6..8], 16)?;
+            (r, g, b, a)
+        }
+        _ => unreachable!(),
+    };
 
-        let a = if n == 4 {
-            parse_single_digit(&s[3..4])?
-        } else {
-            255
-        };
+    Ok(BigColor::from_rgba8(r, g, b, a))
+}
 
-        Ok(Color::from_rgba8(r, g, b, a))
-    } else if n == 6 || n == 8 {
-        let r = u8::from_str_radix(&s[0..2], 16).map_err(|_| ParseColorError::InvalidHex)?;
-        let g = u8::from_str_radix(&s[2..4], 16).map_err(|_| ParseColorError::InvalidHex)?;
-        let b = u8::from_str_radix(&s[4..6], 16).map_err(|_| ParseColorError::InvalidHex)?;
+fn parse_rgb(s: &str) -> Result<BigColor, ParseColorError> {
+    parse_color_args(s, |args, alpha_value| {
+        if args.len() != 3 {
+            return Err(ParseColorError::InvalidRgb);
+        }
 
-        let a = if n == 8 {
-            u8::from_str_radix(&s[6..8], 16).map_err(|_| ParseColorError::InvalidHex)?
-        } else {
-            255
-        };
+        let mut is_percentage = false;
+        let alpha = alpha_value.unwrap_or(1.0);
 
-        Ok(Color::from_rgba8(r, g, b, a))
+        // RGB values
+        let mut rgb = [0.0, 0.0, 0.0];
+
+        for (i, a) in args.iter().enumerate() {
+            let a = a.trim();
+            let (v, pct) = parse_unit(a)?;
+
+            if i == 0 {
+                is_percentage = pct;
+            } else if is_percentage != pct {
+                return Err(ParseColorError::InvalidRgb);
+            }
+
+            if is_percentage {
+                rgb[i] = clamp01(v / 100.0);
+            } else {
+                rgb[i] = clamp01(v / 255.0);
+            }
+        }
+
+        let [r, g, b] = rgb;
+        Ok(BigColor::new(r, g, b, alpha))
+    })
+    .map_err(|_| ParseColorError::InvalidRgb)
+}
+
+fn parse_hsl(s: &str) -> Result<BigColor, ParseColorError> {
+    parse_color_args(s, |args, alpha_value| {
+        if args.len() != 3 {
+            return Err(ParseColorError::InvalidHsl);
+        }
+
+        let h = parse_hue_or_angle(args[0].trim())?;
+        let s = parse_percentage(args[1].trim())?;
+        let l = parse_percentage(args[2].trim())?;
+        let a = alpha_value.unwrap_or(1.0);
+
+        Ok(BigColor::from_hsla(h, s, l, a))
+    })
+    .map_err(|_| ParseColorError::InvalidHsl)
+}
+
+fn parse_hwb(s: &str) -> Result<BigColor, ParseColorError> {
+    parse_color_args(s, |args, alpha_value| {
+        if args.len() != 3 {
+            return Err(ParseColorError::InvalidHwb);
+        }
+
+        let h = parse_hue_or_angle(args[0].trim())?;
+        let w = parse_percentage(args[1].trim())?;
+        let b = parse_percentage(args[2].trim())?;
+        let a = alpha_value.unwrap_or(1.0);
+
+        // HWB is not as common, so we'll convert to HSL first
+        let (r, g, b) = hwb_to_rgb(h, w, b);
+        Ok(BigColor::new(r, g, b, a))
+    })
+    .map_err(|_| ParseColorError::InvalidHwb)
+}
+
+fn parse_hsv(s: &str) -> Result<BigColor, ParseColorError> {
+    parse_color_args(s, |args, alpha_value| {
+        if args.len() != 3 {
+            return Err(ParseColorError::InvalidHsv);
+        }
+
+        let h = parse_hue_or_angle(args[0].trim())?;
+        let s = parse_percentage(args[1].trim())?;
+        let v = parse_percentage(args[2].trim())?;
+        let a = alpha_value.unwrap_or(1.0);
+
+        Ok(BigColor::from_hsva(h, s, v, a))
+    })
+    .map_err(|_| ParseColorError::InvalidHsv)
+}
+
+fn parse_oklab(s: &str) -> Result<BigColor, ParseColorError> {
+    parse_color_args(s, |args, alpha_value| {
+        if args.len() != 3 {
+            return Err(ParseColorError::InvalidOklab);
+        }
+
+        let l = parse_percentage(args[0].trim())?;
+        let a = parse_number(args[1].trim())?;
+        let b = parse_number(args[2].trim())?;
+        let alpha = alpha_value.unwrap_or(1.0);
+
+        Ok(BigColor::from_oklaba(l, a, b, alpha))
+    })
+    .map_err(|_| ParseColorError::InvalidOklab)
+}
+
+fn parse_oklch(s: &str) -> Result<BigColor, ParseColorError> {
+    parse_color_args(s, |args, alpha_value| {
+        if args.len() != 3 {
+            return Err(ParseColorError::InvalidOklch);
+        }
+
+        let l = parse_percentage(args[0].trim())?;
+        let c = parse_number(args[1].trim())?;
+        let h = parse_hue_or_angle(args[2].trim())?;
+        let alpha = alpha_value.unwrap_or(1.0);
+
+        Ok(BigColor::from_oklcha(l, c, h * std::f32::consts::PI / 180.0, alpha))
+    })
+    .map_err(|_| ParseColorError::InvalidOklch)
+}
+
+#[cfg(feature = "lab")]
+fn parse_lab(s: &str) -> Result<BigColor, ParseColorError> {
+    parse_color_args(s, |args, alpha_value| {
+        if args.len() != 3 {
+            return Err(ParseColorError::InvalidLab);
+        }
+
+        let l = parse_percentage(args[0].trim())?;
+        let a = parse_number(args[1].trim())?;
+        let b = parse_number(args[2].trim())?;
+        let alpha = alpha_value.unwrap_or(1.0);
+
+        // Map lightness from percentage to 0-100 scale
+        let l = l * 100.0;
+
+        Ok(BigColor::from_laba(l, a, b, alpha))
+    })
+    .map_err(|_| ParseColorError::InvalidLab)
+}
+
+#[cfg(feature = "lab")]
+fn parse_lch(s: &str) -> Result<BigColor, ParseColorError> {
+    parse_color_args(s, |args, alpha_value| {
+        if args.len() != 3 {
+            return Err(ParseColorError::InvalidLch);
+        }
+
+        let l = parse_percentage(args[0].trim())?;
+        let c = parse_number(args[1].trim())?;
+        let h = parse_hue_or_angle(args[2].trim())?;
+        let alpha = alpha_value.unwrap_or(1.0);
+
+        // Map lightness from percentage to 0-100 scale
+        let l = l * 100.0;
+
+        Ok(BigColor::from_lcha(l, c, h * std::f32::consts::PI / 180.0, alpha))
+    })
+    .map_err(|_| ParseColorError::InvalidLch)
+}
+
+fn parse_percentage(s: &str) -> Result<f32, ParseColorError> {
+    if let Some(s) = s.strip_suffix('%') {
+        let v = s.parse::<f32>().map_err(|_| ParseColorError::InvalidValue)?;
+        Ok(v / 100.0)
     } else {
-        Err(ParseColorError::InvalidHex)
+        let v = s.parse::<f32>().map_err(|_| ParseColorError::InvalidValue)?;
+        Ok(v)
     }
 }
 
-fn parse_percent_or_float(s: &str) -> Option<(f32, bool)> {
-    s.strip_suffix('%')
-        .and_then(|s| s.parse().ok().map(|t: f32| (t / 100.0, true)))
-        .or_else(|| s.parse().ok().map(|t| (t, false)))
+fn parse_number(s: &str) -> Result<f32, ParseColorError> {
+    s.parse::<f32>().map_err(|_| ParseColorError::InvalidValue)
 }
 
-fn parse_percent_or_255(s: &str) -> Option<(f32, bool)> {
-    s.strip_suffix('%')
-        .and_then(|s| s.parse().ok().map(|t: f32| (t / 100.0, true)))
-        .or_else(|| s.parse().ok().map(|t: f32| (t / 255.0, false)))
+fn parse_hue_or_angle(s: &str) -> Result<f32, ParseColorError> {
+    if let Some(s) = s.strip_suffix("deg") {
+        let v = s.parse::<f32>().map_err(|_| ParseColorError::InvalidValue)?;
+        return Ok(v % 360.0);
+    }
+
+    if let Some(s) = s.strip_suffix("rad") {
+        let v = s.parse::<f32>().map_err(|_| ParseColorError::InvalidValue)?;
+        return Ok(v * 180.0 / std::f32::consts::PI);
+    }
+
+    if let Some(s) = s.strip_suffix("grad") {
+        let v = s.parse::<f32>().map_err(|_| ParseColorError::InvalidValue)?;
+        return Ok(v * 0.9);
+    }
+
+    if let Some(s) = s.strip_suffix("turn") {
+        let v = s.parse::<f32>().map_err(|_| ParseColorError::InvalidValue)?;
+        return Ok(v * 360.0);
+    }
+
+    parse_number(s)
 }
 
-fn parse_angle(s: &str) -> Option<f32> {
-    s.strip_suffix("deg")
-        .and_then(|s| s.parse().ok())
-        .or_else(|| {
-            s.strip_suffix("grad")
-                .and_then(|s| s.parse().ok())
-                .map(|t: f32| t * 360.0 / 400.0)
-        })
-        .or_else(|| {
-            s.strip_suffix("rad")
-                .and_then(|s| s.parse().ok())
-                .map(|t: f32| t.to_degrees())
-        })
-        .or_else(|| {
-            s.strip_suffix("turn")
-                .and_then(|s| s.parse().ok())
-                .map(|t: f32| t * 360.0)
-        })
-        .or_else(|| s.parse().ok())
+fn parse_unit(s: &str) -> Result<(f32, bool), ParseColorError> {
+    if let Some(s) = s.strip_suffix('%') {
+        let v = s.parse::<f32>().map_err(|_| ParseColorError::InvalidValue)?;
+        Ok((v, true))
+    } else {
+        let v = s.parse::<f32>().map_err(|_| ParseColorError::InvalidValue)?;
+        Ok((v, false))
+    }
 }
 
-// Map t from range [a, b] to range [c, d]
-fn remap(t: f32, a: f32, b: f32, c: f32, d: f32) -> f32 {
-    (t - a) * ((d - c) / (b - a)) + c
+/// Split color args and parse.
+///
+/// # Examples
+///
+/// ```
+/// // "1, 2, 3, 0.5" => [1, 2, 3], Some(0.5)
+/// // "1 2 3" => [1, 2, 3], None
+/// // "1 2 3 / 0.5" => [1, 2, 3], Some(0.5)
+/// ```
+fn parse_color_args<F, T, E>(
+    s: &str,
+    f: F,
+) -> Result<T, E>
+where
+    F: FnOnce(Vec<&str>, Option<f32>) -> Result<T, E>,
+    E: From<()>,
+{
+    let mut alpha = None;
+
+    // The slash separator: "1 2 3 / 0.5"
+    let mut parts: Vec<&str> = if let Some(i) = s.find('/') {
+        let alpha_str = s[i + 1..].trim();
+        let alpha_value = alpha_str.parse::<f32>().map_err(|_| ())?;
+        alpha = Some(alpha_value.clamp(0.0, 1.0));
+        s[..i].split_whitespace().collect()
+    } else if s.contains(',') {
+        // The comma separator: "1, 2, 3, 0.5"
+        let mut parts: Vec<&str> = s.split(',').collect();
+        if parts.len() == 4 {
+            let alpha_str = parts.pop().unwrap().trim();
+            let alpha_value = alpha_str.parse::<f32>().map_err(|_| ())?;
+            alpha = Some(alpha_value.clamp(0.0, 1.0));
+        }
+        parts
+    } else {
+        // The whitespace separator: "1 2 3"
+        s.split_whitespace().collect()
+    };
+
+    if parts.is_empty() {
+        parts = s.split(',').collect();
+    }
+
+    f(parts, alpha)
+}
+
+#[inline]
+fn clamp01(t: f32) -> f32 {
+    t.clamp(0.0, 1.0)
+}
+
+// Helper functions for color conversion
+fn hue_to_rgb(n1: f32, n2: f32, h: f32) -> f32 {
+    let h = ((h % 6.0) + 6.0) % 6.0;
+
+    if h < 1.0 {
+        return n1 + ((n2 - n1) * h);
+    }
+
+    if h < 3.0 {
+        return n2;
+    }
+
+    if h < 4.0 {
+        return n1 + ((n2 - n1) * (4.0 - h));
+    }
+
+    n1
+}
+
+fn hsl_to_rgb(h: f32, s: f32, l: f32) -> (f32, f32, f32) {
+    if s == 0.0 {
+        return (l, l, l);
+    }
+
+    let n2 = if l < 0.5 {
+        l * (1.0 + s)
+    } else {
+        l + s - (l * s)
+    };
+
+    let n1 = 2.0 * l - n2;
+    let h = h / 60.0;
+    let r = hue_to_rgb(n1, n2, h + 2.0);
+    let g = hue_to_rgb(n1, n2, h);
+    let b = hue_to_rgb(n1, n2, h - 2.0);
+    (r, g, b)
+}
+
+fn hwb_to_rgb(h: f32, w: f32, b: f32) -> (f32, f32, f32) {
+    let sum = w + b;
+    if sum >= 1.0 {
+        let gray = w / sum;
+        return (gray, gray, gray);
+    }
+
+    let (r, g, b) = hsl_to_rgb(h, 1.0, 0.5);
+    let r = r * (1.0 - w - b) + w;
+    let g = g * (1.0 - w - b) + w;
+    let b = b * (1.0 - w - b) + w;
+    (r, g, b)
 }
 
 #[cfg(test)]
@@ -427,60 +491,48 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_parse_percent_or_float() {
+    fn test_parse_percentage() {
         let test_data = [
-            ("0%", Some((0.0, true))),
-            ("100%", Some((1.0, true))),
-            ("50%", Some((0.5, true))),
-            ("0", Some((0.0, false))),
-            ("1", Some((1.0, false))),
-            ("0.5", Some((0.5, false))),
-            ("100.0", Some((100.0, false))),
-            ("-23.7", Some((-23.7, false))),
-            ("%", None),
-            ("1x", None),
+            ("0%", Ok(0.0)),
+            ("100%", Ok(1.0)),
+            ("50%", Ok(0.5)),
+            ("0", Ok(0.0)),
+            ("1", Ok(1.0)),
+            ("0.5", Ok(0.5)),
         ];
         for (s, expected) in test_data {
-            assert_eq!(parse_percent_or_float(s), expected);
+            assert_eq!(parse_percentage(s), expected);
         }
     }
 
     #[test]
-    fn test_parse_percent_or_255() {
+    fn test_parse_number() {
         let test_data = [
-            ("0%", Some((0.0, true))),
-            ("100%", Some((1.0, true))),
-            ("50%", Some((0.5, true))),
-            ("-100%", Some((-1.0, true))),
-            ("0", Some((0.0, false))),
-            ("255", Some((1.0, false))),
-            ("127.5", Some((0.5, false))),
-            ("%", None),
-            ("255x", None),
+            ("0", Ok(0.0)),
+            ("255", Ok(255.0)),
+            ("127.5", Ok(127.5)),
+            ("-100", Ok(-100.0)),
         ];
         for (s, expected) in test_data {
-            assert_eq!(parse_percent_or_255(s), expected);
+            assert_eq!(parse_number(s), expected);
         }
     }
 
     #[test]
-    fn test_parse_angle() {
+    fn test_parse_hue_or_angle() {
         let test_data = [
-            ("360", Some(360.0)),
-            ("127.356", Some(127.356)),
-            ("+120deg", Some(120.0)),
-            ("90deg", Some(90.0)),
-            ("-127deg", Some(-127.0)),
-            ("100grad", Some(90.0)),
-            ("1.5707963267948966rad", Some(90.0)),
-            ("0.25turn", Some(90.0)),
-            ("-0.25turn", Some(-90.0)),
-            ("O", None),
-            ("Odeg", None),
-            ("rad", None),
+            ("360", Ok(360.0)),
+            ("127.356", Ok(127.356)),
+            ("+120deg", Ok(120.0)),
+            ("90deg", Ok(90.0)),
+            ("-127deg", Ok(-127.0)),
+            ("100grad", Ok(90.0)),
+            ("1.5707963267948966rad", Ok(90.0)),
+            ("0.25turn", Ok(90.0)),
+            ("-0.25turn", Ok(-90.0)),
         ];
         for (s, expected) in test_data {
-            assert_eq!(parse_angle(s), expected);
+            assert_eq!(parse_hue_or_angle(s), expected);
         }
     }
 }
