@@ -1,4 +1,5 @@
 Goal: Port [Tinycolor](https://github.com/bgrins/TinyColor/blob/master/npm/tinycolor.js) and combine with the great csscolorparser Rust color parser
+> And provide a `.toPenikoColor()` for peniko::Color
 ----
 
 [Rust](https://www.rust-lang.org/) library for parsing CSS color string as defined in the W3C's [CSS Color Module Level 4](https://www.w3.org/TR/css-color-4/).
