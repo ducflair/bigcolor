@@ -69,9 +69,9 @@ impl SolidColor {
         };
         let p = 2.0 * l - q;
 
-        let r = crate::big_color::hue_to_rgb(p, q, h + 120.0);
-        let g = crate::big_color::hue_to_rgb(p, q, h);
-        let b = crate::big_color::hue_to_rgb(p, q, h - 120.0);
+        let r = crate::bigcolor::hue_to_rgb(p, q, h + 120.0);
+        let g = crate::bigcolor::hue_to_rgb(p, q, h);
+        let b = crate::bigcolor::hue_to_rgb(p, q, h - 120.0);
 
         Self::new(r, g, b, a)
     }
@@ -142,7 +142,7 @@ impl SolidColor {
     /// * `v`: Value [0..1]
     /// * `a`: Alpha [0..1]
     pub fn to_hsva(&self) -> [f32; 4] {
-        let (h, s, v) = crate::big_color::rgb_to_hsv(self.r, self.g, self.b);
+        let (h, s, v) = crate::bigcolor::rgb_to_hsv(self.r, self.g, self.b);
         [h, s, v, self.a]
     }
 
@@ -153,7 +153,7 @@ impl SolidColor {
     /// * `l`: Lightness [0..1]
     /// * `a`: Alpha [0..1]
     pub fn to_hsla(&self) -> [f32; 4] {
-        let (h, s, l) = crate::big_color::rgb_to_hsl(self.r, self.g, self.b);
+        let (h, s, l) = crate::bigcolor::rgb_to_hsl(self.r, self.g, self.b);
         [h, s, l, self.a]
     }
 
@@ -296,7 +296,7 @@ impl SolidColor {
         if self.a < 1.0 {
             format!("cmyka({}%, {}%, {}%, {}%, {})", 
                 c_pct, m_pct, y_pct, k_pct, 
-                crate::big_color::round_to_decimal_places(self.a, 2)
+                crate::bigcolor::round_to_decimal_places(self.a, 2)
             )
         } else {
             format!("cmyk({}%, {}%, {}%, {}%)", 
@@ -321,7 +321,7 @@ impl SolidColor {
                 h_rounded,
                 s_rounded,
                 v_rounded,
-                crate::big_color::round_to_decimal_places(self.a, 2)
+                crate::bigcolor::round_to_decimal_places(self.a, 2)
             )
         } else {
             format!("hsv({}, {}%, {}%)", 
@@ -348,7 +348,7 @@ impl SolidColor {
                 h_rounded,
                 s_rounded,
                 l_rounded,
-                crate::big_color::round_to_decimal_places(self.a, 2)
+                crate::bigcolor::round_to_decimal_places(self.a, 2)
             )
         } else {
             format!("hsl({}, {}%, {}%)", 
@@ -377,7 +377,7 @@ impl SolidColor {
                 r_rounded,
                 g_rounded,
                 b_rounded,
-                crate::big_color::round_to_decimal_places(self.a, 2)
+                crate::bigcolor::round_to_decimal_places(self.a, 2)
             )
         } else {
             format!("rgb({}%, {}%, {}%)",
@@ -386,6 +386,11 @@ impl SolidColor {
                 b_rounded
             )
         }
+    }
+
+    /// Parse a color string
+    pub fn parse<S: AsRef<str>>(color_str: S) -> Result<Self, ParseColorError> {
+        Self::from_str(color_str.as_ref())
     }
 }
 

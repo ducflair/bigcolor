@@ -1,12 +1,31 @@
-# Goal: 
-- Port [Tinycolor](https://github.com/bgrins/TinyColor/blob/master/npm/tinycolor.js) in combination with [csscolorparser](https://docs.rs/csscolorparser/latest/csscolorparser/) as a base.
-- Provide `.toPenikoColor()` for peniko::Color
-- Provide `.getContrast(intensity)`
+<p align="center">
+  <br/>
+  <a href="https://duc.ducflair.com" target="_blank"><img width="256px" src="public/logo.png" /></a>
+  <p align="center">Rust Color Parser</p>
+  <p align="center" style="align: center;">
+    <!-- <a href="https://crates.io/crates/ducflair-duc/"><img src="https://shields.io/badge/Crates-FFC933?logo=Rust&logoColor=646464&style=round-square" alt="Crates" /></a>
+    <a href="https://github.com/ducflair/duc/releases"><img src="https://img.shields.io/crates/v/ducflair-duc?style=round-square&label=latest%20stable" alt="Crates.io ducflair-duc@latest release" /></a>
+    <a href="https://crates.io/crates/ducflair-duc"><img src="https://img.shields.io/crates/d/ducflair-duc?style=round-square&color=salmon" alt="Downloads" /></a> -->
+    <img src="https://shields.io/badge/Rust-CE412B?logo=Rust&logoColor=fff&style=round-square" alt="Rust" />
+  </p>
+</p>
+
+# bigcolor
+
+**bigcolor** is a comprehensive Rust library for CSS color parsing and manipulation, inspired by [TinyColor](https://github.com/bgrins/TinyColor) with the parsing capabilities of [csscolorparser](https://docs.rs/csscolorparser/latest/csscolorparser/). It provides powerful tools for working with colors in various formats, creating color schemes, and performing color transformations.
+
+Key features include:
+- **Extensive format support** for all standard CSS colors
+- **Advanced color manipulation** including lighten, darken, rotation and more
+- **Color scheme generation** including complementary, triad, tetrad and more
+- **Blending modes** similar to those found in graphics software
+- **CMYK support** for print-oriented applications
+- **Peniko Color** support for renderers
+- **CSS gradients support** (Work in Progress)
+
 ----
 
-[Rust](https://www.rust-lang.org/) library for parsing CSS color string as defined in the W3C's [CSS Color Module Level 4](https://www.w3.org/TR/css-color-4/), with advanced color manipulation capabilities.
-
-## Supported Color Format
+## Supported Color Formats
 
 * [Named colors](https://www.w3.org/TR/css-color-4/#named-colors)
 * RGB hexadecimal (with and without `#` prefix)
@@ -17,8 +36,7 @@
 * `rgb()` and `rgba()`
 * `hsl()` and `hsla()`
 * `hwb()`
-* `lab()` and `lch()` (with `lab` feature enabled)
-* `oklab()` and `oklch()`
+* `lab()` (with `lab` feature enabled)
 * `color()` (CSS Color 4 color function for different color spaces)
 * `cmyk()` and `cmyka()` (not in CSS standard)
 * `hwba()`, `hsv()`, `hsva()` (not in CSS standard)
@@ -163,8 +181,6 @@ let hsv_mid = yellow.interpolate(&blue, 0.5, InterpolationSpace::HSV);
 // With lab feature enabled
 #[cfg(feature = "lab")]
 let lab_mid = yellow.interpolate(&blue, 0.5, InterpolationSpace::LAB);
-#[cfg(feature = "lab")]
-let lch_mid = yellow.interpolate(&blue, 0.5, InterpolationSpace::LCH);
 ```
 
 ### CSS4 Color Function Support
@@ -178,22 +194,19 @@ let xyz = BigColor::parse("color(xyz 0.4124 0.2126 0.0193)")?;
 // Other supported color spaces: a98-rgb, prophoto-rgb, rec2020, xyz-d50, xyz-d65
 ```
 
-### LAB and LCH Colors (with "lab" feature)
+### LAB Colors (with "lab" feature)
 
 ```rust
 #[cfg(feature = "lab")]
 {
-    // Create colors from Lab and LCh values
+    // Create colors from Lab values
     let lab_color = BigColor::from_laba(50.0, 50.0, 0.0, 1.0);
-    let lch_color = BigColor::from_lcha(50.0, 50.0, 60.0, 1.0);
     
-    // Convert to Lab and LCh
+    // Convert to Lab
     let (l, a, b) = some_color.to_lab();
-    let (l, c, h) = some_color.to_lch();
     
-    // Get string representations
+    // Get string representation
     println!("Lab string: {}", lab_color.to_lab_string());
-    println!("LCh string: {}", lch_color.to_lch_string());
 }
 ```
 
@@ -205,7 +218,7 @@ let xyz = BigColor::parse("color(xyz 0.4124 0.2126 0.0193)")?;
 
 ### Optional
 
-* __lab__: Enables parsing `lab()` and `lch()` color format and adds advanced LAB/LCH color manipulation.
+* __lab__: Enables parsing `lab()` color format and adds advanced LAB color manipulation.
 * __rust-rgb__: Enables converting from [`rgb`](https://crates.io/crates/rgb) crate types into `BigColor`.
 * __cint__: Enables converting [`cint`](https://crates.io/crates/cint) crate types to and from `BigColor`.
 * __serde__: Enables serializing (into HEX string) and deserializing (from any supported string color format) using [`serde`](https://serde.rs/) framework.
@@ -216,9 +229,9 @@ let xyz = BigColor::parse("color(xyz 0.4124 0.2126 0.0193)")?;
 * [csscolorparser](https://github.com/deanm/css-color-parser-js) (Javascript)
 * [TinyColor](https://github.com/bgrins/TinyColor) (Javascript)
 
-## Gradient Support
+## Gradient Support (Work in Progress)
 
-BigColor now supports CSS gradients, allowing for powerful color manipulation:
+bigcolor supports CSS gradients, allowing for powerful color manipulation:
 
 ```rust
 use bigcolor::{SolidColor, Gradient, ColorStop, GradientExtend};
@@ -283,7 +296,7 @@ let comp_gradient = gradient.complementary();
 
 - Create gradients with multiple color stops
 - Sample colors at any point along the gradient
-- Parse CSS gradient strings
+- Parse CSS gradient strings (Work in Progress)
 - Create complementary gradients
 - Integrate with color manipulation features
 

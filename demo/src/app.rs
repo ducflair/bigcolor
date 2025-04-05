@@ -222,8 +222,21 @@ pub fn app() -> Html {
     
     let format_copy = {
         Callback::from(move |text: String| {
-            // Just log that user clicked on the format
-            log!("Format clicked: ", text);
+            if let Some(window) = web_sys::window() {
+                // Get the navigator
+                let navigator = window.navigator();
+                // Get the clipboard
+                let clipboard = navigator.clipboard();
+                
+                // Clone text since it will be moved into the closure
+                let text_clone = text.clone();
+                
+                // Write to clipboard
+                let _ = clipboard.write_text(&text);
+                
+                // Log success
+                log!("Copied to clipboard: ", text_clone);
+            }
         })
     };
     

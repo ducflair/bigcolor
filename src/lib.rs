@@ -29,7 +29,7 @@ extern crate lab;
 extern crate palette;
 
 mod parser;
-mod big_color;
+mod bigcolor;
 mod solid;
 mod gradient;
 
@@ -37,6 +37,6 @@ mod gradient;
 mod cint;
 
 pub use parser::{ParseColorError, NAMED_COLORS};
-pub use big_color::BigColor;
+pub use bigcolor::BigColor;
 pub use solid::SolidColor;
 pub use gradient::{Gradient, ColorStop, GradientType, GradientExtend};

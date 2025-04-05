@@ -1,4 +1,4 @@
-use std::{error, fmt};
+use std::fmt;
 use std::num::ParseFloatError;
 
 use crate::BigColor;
@@ -11,7 +11,7 @@ pub use named_colors::NAMED_COLORS;
 
 /// Internal RGBA color structure used for parsing
 #[derive(Debug, Clone, Copy)]
-struct RgbaColor {
+pub(crate) struct RgbaColor {
     r: f32,
     g: f32,
     b: f32, 
@@ -39,12 +39,6 @@ pub enum ParseColorError {
     InvalidCmykColor,
     /// Invalid LAB color format
     InvalidLabColor,
-    /// Invalid LCH color format
-    InvalidLchColor,
-    /// Invalid OKLAB color format
-    InvalidOklabColor,
-    /// Invalid OKLCH color format
-    InvalidOklchColor,
     /// Invalid XYZ color format
     InvalidXyzColor,
     /// Invalid CSS color function
@@ -73,9 +67,6 @@ impl fmt::Display for ParseColorError {
             Self::InvalidNamedColor => write!(f, "Invalid color name"),
             Self::InvalidCmykColor => write!(f, "Invalid CMYK color format"),
             Self::InvalidLabColor => write!(f, "Invalid LAB color format"),
-            Self::InvalidLchColor => write!(f, "Invalid LCH color format"),
-            Self::InvalidOklabColor => write!(f, "Invalid OKLAB color format"),
-            Self::InvalidOklchColor => write!(f, "Invalid OKLCH color format"),
             Self::InvalidXyzColor => write!(f, "Invalid XYZ color format"),
             Self::InvalidColorFunction => write!(f, "Invalid CSS color function"),
             Self::InvalidFunction => write!(f, "Invalid CSS function"),
@@ -175,13 +166,9 @@ pub(crate) fn parse_internal(s: &str) -> Result<RgbaColor, ParseColorError> {
                 "hsl" | "hsla" => return parse_hsl(args),
                 "hwb" | "hwba" => return parse_hwb(args),
                 "hsv" | "hsva" => return parse_hsv(args),
-                "oklab" | "oklaba" => return parse_oklab(args),
-                "oklch" | "oklcha" => return parse_oklch(args),
                 "color" => return parse_color_function(args),
                 #[cfg(feature = "lab")]
                 "lab" | "laba" => return parse_lab(args),
-                #[cfg(feature = "lab")]
-                "lch" | "lcha" => return parse_lch(args),
                 _ => return Err(ParseColorError::InvalidFunction),
             }
         }
@@ -344,258 +331,6 @@ fn parse_hsv(s: &str) -> Result<RgbaColor, ParseColorError> {
     .map_err(|_| ParseColorError::InvalidHsvColor)
 }
 
-fn parse_oklab(s: &str) -> Result<RgbaColor, ParseColorError> {
-    parse_color_args(s, |args, alpha_value| {
-        if args.len() != 3 {
-            return Err(ParseColorError::InvalidOklabColor);
-        }
-
-        let l = parse_percentage(args[0].trim())?;
-        let a = parse_number(args[1].trim())?;
-        let b = parse_number(args[2].trim())?;
-        let alpha = alpha_value.unwrap_or(1.0);
-
-        Ok(RgbaColor {
-            r: oklab_to_rgb(l, a, b).0,
-            g: oklab_to_rgb(l, a, b).1,
-            b: oklab_to_rgb(l, a, b).2,
-            a: alpha,
-        })
-    })
-    .map_err(|_| ParseColorError::InvalidOklabColor)
-}
-
-fn parse_oklch(s: &str) -> Result<RgbaColor, ParseColorError> {
-    parse_color_args(s, |args, alpha_value| {
-        if args.len() != 3 {
-            return Err(ParseColorError::InvalidOklchColor);
-        }
-
-        let l = parse_percentage(args[0].trim())?;
-        let c = parse_number(args[1].trim())?;
-        let h = parse_hue_or_angle(args[2].trim())?;
-        let alpha = alpha_value.unwrap_or(1.0);
-
-        Ok(RgbaColor {
-            r: oklch_to_rgb(l, c, h).0,
-            g: oklch_to_rgb(l, c, h).1,
-            b: oklch_to_rgb(l, c, h).2,
-            a: alpha,
-        })
-    })
-    .map_err(|_| ParseColorError::InvalidOklchColor)
-}
-
-            #[cfg(feature = "lab")]
-fn parse_lab(s: &str) -> Result<RgbaColor, ParseColorError> {
-    parse_color_args(s, |args, alpha_value| {
-        if args.len() != 3 {
-            return Err(ParseColorError::InvalidLabColor);
-        }
-
-        let l = parse_percentage(args[0].trim())?;
-        let a = parse_number(args[1].trim())?;
-        let b = parse_number(args[2].trim())?;
-        let alpha = alpha_value.unwrap_or(1.0);
-
-        // Map lightness from percentage to 0-100 scale
-        let l = l * 100.0;
-
-        Ok(RgbaColor {
-            r: lab_to_rgb(l, a, b).0,
-            g: lab_to_rgb(l, a, b).1,
-            b: lab_to_rgb(l, a, b).2,
-            a: alpha,
-        })
-    })
-    .map_err(|_| ParseColorError::InvalidLabColor)
-}
-
-            #[cfg(feature = "lab")]
-fn parse_lch(s: &str) -> Result<RgbaColor, ParseColorError> {
-    parse_color_args(s, |args, alpha_value| {
-        if args.len() != 3 {
-            return Err(ParseColorError::InvalidLchColor);
-        }
-
-        let l = parse_percentage(args[0].trim())?;
-        let c = parse_number(args[1].trim())?;
-        let h = parse_hue_or_angle(args[2].trim())?;
-        let alpha = alpha_value.unwrap_or(1.0);
-
-        // Map lightness from percentage to 0-100 scale
-        let l = l * 100.0;
-
-        Ok(RgbaColor {
-            r: lch_to_rgb(l, c, h).0,
-            g: lch_to_rgb(l, c, h).1,
-            b: lch_to_rgb(l, c, h).2,
-            a: alpha,
-        })
-    })
-    .map_err(|_| ParseColorError::InvalidLchColor)
-}
-
-fn parse_percentage(s: &str) -> Result<f32, ParseColorError> {
-    if let Some(s) = s.strip_suffix('%') {
-        let v = s.parse::<f32>().map_err(|e| ParseColorError::InvalidNumberFormat(e))?;
-        Ok(v / 100.0)
-                } else {
-        let v = s.parse::<f32>().map_err(|e| ParseColorError::InvalidNumberFormat(e))?;
-        Ok(v)
-    }
-}
-
-fn parse_number(s: &str) -> Result<f32, ParseColorError> {
-    s.parse::<f32>().map_err(|e| ParseColorError::InvalidNumberFormat(e))
-}
-
-fn parse_hue_or_angle(s: &str) -> Result<f32, ParseColorError> {
-    if let Some(s) = s.strip_suffix("deg") {
-        let v = s.parse::<f32>().map_err(|e| ParseColorError::InvalidNumberFormat(e))?;
-        return Ok(v % 360.0);
-    }
-
-    if let Some(s) = s.strip_suffix("rad") {
-        let v = s.parse::<f32>().map_err(|e| ParseColorError::InvalidNumberFormat(e))?;
-        return Ok(v * 180.0 / std::f32::consts::PI);
-    }
-
-    if let Some(s) = s.strip_suffix("grad") {
-        let v = s.parse::<f32>().map_err(|e| ParseColorError::InvalidNumberFormat(e))?;
-        return Ok(v * 0.9);
-    }
-
-    if let Some(s) = s.strip_suffix("turn") {
-        let v = s.parse::<f32>().map_err(|e| ParseColorError::InvalidNumberFormat(e))?;
-        return Ok(v * 360.0);
-    }
-
-    parse_number(s)
-}
-
-fn parse_unit(s: &str) -> Result<(f32, bool), ParseColorError> {
-    if let Some(s) = s.strip_suffix('%') {
-        let v = s.parse::<f32>().map_err(|e| ParseColorError::InvalidNumberFormat(e))?;
-        Ok((v, true))
-    } else {
-        let v = s.parse::<f32>().map_err(|e| ParseColorError::InvalidNumberFormat(e))?;
-        Ok((v, false))
-    }
-}
-
-/// Split color args and parse.
-///
-/// # Examples
-///
-/// ```
-/// // "1, 2, 3, 0.5" => [1, 2, 3], Some(0.5)
-/// // "1 2 3" => [1, 2, 3], None
-/// // "1 2 3 / 0.5" => [1, 2, 3], Some(0.5)
-/// ```
-fn parse_color_args<F, T, E>(
-    s: &str,
-    f: F,
-) -> Result<T, E>
-where
-    F: FnOnce(Vec<&str>, Option<f32>) -> Result<T, E>,
-    E: From<()>,
-{
-    let mut alpha = None;
-
-    // The slash separator: "1 2 3 / 0.5"
-    let mut parts: Vec<&str> = if let Some(i) = s.find('/') {
-        let alpha_str = s[i + 1..].trim();
-        let alpha_value = alpha_str.parse::<f32>().map_err(|_| ())?;
-        alpha = Some(alpha_value.clamp(0.0, 1.0));
-        s[..i].split_whitespace().collect()
-    } else if s.contains(',') {
-        // The comma separator: "1, 2, 3, 0.5"
-        let mut parts: Vec<&str> = s.split(',').collect();
-        if parts.len() == 4 {
-            let alpha_str = parts.pop().unwrap().trim();
-            let alpha_value = alpha_str.parse::<f32>().map_err(|_| ())?;
-            alpha = Some(alpha_value.clamp(0.0, 1.0));
-        }
-        parts
-                } else {
-        // The whitespace separator: "1 2 3"
-        s.split_whitespace().collect()
-    };
-
-    if parts.is_empty() {
-        parts = s.split(',').collect();
-    }
-
-    f(parts, alpha)
-}
-
-#[inline]
-fn clamp01(t: f32) -> f32 {
-    t.clamp(0.0, 1.0)
-}
-
-// Helper functions for color conversion
-fn hue_to_rgb(n1: f32, n2: f32, h: f32) -> f32 {
-    let h = ((h % 6.0) + 6.0) % 6.0;
-
-    if h < 1.0 {
-        return n1 + ((n2 - n1) * h);
-    }
-
-    if h < 3.0 {
-        return n2;
-    }
-
-    if h < 4.0 {
-        return n1 + ((n2 - n1) * (4.0 - h));
-    }
-
-    n1
-}
-
-fn hsl_to_rgb(h: f32, s: f32, l: f32) -> (f32, f32, f32) {
-    if s == 0.0 {
-        return (l, l, l);
-    }
-
-    let n2 = if l < 0.5 {
-        l * (1.0 + s)
-    } else {
-        l + s - (l * s)
-    };
-
-    let n1 = 2.0 * l - n2;
-    let h = h / 60.0;
-    let r = hue_to_rgb(n1, n2, h + 2.0);
-    let g = hue_to_rgb(n1, n2, h);
-    let b = hue_to_rgb(n1, n2, h - 2.0);
-    (r, g, b)
-}
-
-fn hwb_to_rgb(h: f32, w: f32, b: f32) -> (f32, f32, f32) {
-    let sum = w + b;
-    if sum >= 1.0 {
-        let gray = w / sum;
-        return (gray, gray, gray);
-    }
-
-    let (r, g, b) = hsl_to_rgb(h, 1.0, 0.5);
-    let r = r * (1.0 - w - b) + w;
-    let g = g * (1.0 - w - b) + w;
-    let b = b * (1.0 - w - b) + w;
-    (r, g, b)
-}
-
-/// Parse the CSS Color 4 `color()` function
-/// Format: color(colorspace c1 c2 c3[ / alpha])
-/// Examples:
-///   color(srgb 1 0 0)
-///   color(srgb 1 0 0 / 0.5)
-///   color(display-p3 1 0.5 0)
-///   color(a98-rgb 1 0 0)
-///   color(prophoto-rgb 1 0 0)
-///   color(rec2020 1 0 0)
 fn parse_color_function(s: &str) -> Result<RgbaColor, ParseColorError> {
     let parts: Vec<&str> = s.split_whitespace().collect();
     
@@ -794,59 +529,211 @@ fn hsv_to_rgb(h: f32, s: f32, v: f32) -> (f32, f32, f32) {
     }
 }
 
-// Simplified Oklab to RGB conversion
-fn oklab_to_rgb(l: f32, a: f32, b: f32) -> (f32, f32, f32) {
-    // These are simplified conversions, not accurate
-    // For a demo, we'll do a simple mapping
-    let lightness = l.clamp(0.0, 1.0);
+// Add LAB function if needed
+#[cfg(feature = "lab")]
+fn parse_lab(s: &str) -> Result<RgbaColor, ParseColorError> {
+    parse_color_args(s, |args, alpha_value| {
+        if args.len() != 3 {
+            return Err(ParseColorError::InvalidLabColor);
+        }
+
+        let l_str = args[0].trim();
+        let a_str = args[1].trim();
+        let b_str = args[2].trim();
+        
+        // Handle lightness (L) - must be between 0-100
+        let l = if l_str.ends_with('%') {
+            // If percentage, use as is but clamp
+            let val = l_str.trim_end_matches('%').parse::<f32>()?;
+            val.clamp(0.0, 100.0)
+        } else {
+            // If number, use directly but clamp
+            l_str.parse::<f32>()?.clamp(0.0, 100.0)
+        };
+        
+        // Handle a and b components
+        let a = a_str.parse::<f32>()?;
+        let b = b_str.parse::<f32>()?;
+        
+        let alpha = alpha_value.unwrap_or(1.0);
+
+        Ok(RgbaColor {
+            r: lab_to_rgb(l, a, b).0,
+            g: lab_to_rgb(l, a, b).1,
+            b: lab_to_rgb(l, a, b).2,
+            a: alpha,
+        })
+    })
+    .map_err(|_| ParseColorError::InvalidLabColor)
+}
+
+#[cfg(feature = "lab")]
+fn lab_to_rgb(l: f32, a: f32, b: f32) -> (f32, f32, f32) {
+    use palette::{rgb::Srgb, Lab, FromColor};
     
-    // Map a and b to red-green and yellow-blue
-    let red_bias = a.clamp(-0.4, 0.4) + 0.4;
-    let blue_bias = b.clamp(-0.4, 0.4) + 0.4;
+    // Convert l from 0-100 range to 0-1 range for palette
+    let normalized_l = l / 100.0;
     
-    // Simplistic conversion that preserves lightness
-    let r = (lightness * red_bias / 0.8).clamp(0.0, 1.0);
-    let g = (lightness * (1.0 - red_bias / 0.8) * (1.0 - blue_bias / 0.8)).clamp(0.0, 1.0);
-    let b = (lightness * blue_bias / 0.8).clamp(0.0, 1.0);
+    // Create a Lab color
+    let lab = Lab::new(normalized_l, a, b);
+    
+    // Convert to RGB
+    let rgb = Srgb::from_color(lab);
+    
+    // Get the RGB components and clamp to valid range
+    let r = rgb.red.clamp(0.0, 1.0);
+    let g = rgb.green.clamp(0.0, 1.0);
+    let b = rgb.blue.clamp(0.0, 1.0);
     
     (r, g, b)
 }
 
-// Simplified Oklch to RGB conversion
-fn oklch_to_rgb(l: f32, c: f32, h: f32) -> (f32, f32, f32) {
-    // Convert LCH to Lab
-    let angle = h * std::f32::consts::PI / 180.0;
-    let a = c * angle.cos();
-    let b = c * angle.sin();
-    
-    // Then use our Oklab to RGB conversion
-    oklab_to_rgb(l, a, b)
+fn hue_to_rgb(n1: f32, n2: f32, h: f32) -> f32 {
+    let h = ((h % 6.0) + 6.0) % 6.0;
+
+    if h < 1.0 {
+        return n1 + ((n2 - n1) * h);
+    }
+
+    if h < 3.0 {
+        return n2;
+    }
+
+    if h < 4.0 {
+        return n1 + ((n2 - n1) * (4.0 - h));
+    }
+
+    n1
 }
 
-// Add LAB and LCH functions if needed
-#[cfg(feature = "lab")]
-fn lab_to_rgb(l: f32, a: f32, b: f32) -> (f32, f32, f32) {
-    // Simplified conversion for demo
-    let lightness = (l / 100.0).clamp(0.0, 1.0);
-    
-    // Map a and b to red-green and yellow-blue
-    let red_green = (a / 128.0).clamp(-1.0, 1.0);
-    let yellow_blue = (b / 128.0).clamp(-1.0, 1.0);
-    
-    let r = (lightness + red_green * 0.5).clamp(0.0, 1.0);
-    let g = (lightness - red_green * 0.5 - yellow_blue * 0.25).clamp(0.0, 1.0);
-    let b = (lightness + yellow_blue * 0.5).clamp(0.0, 1.0);
-    
+fn hsl_to_rgb(h: f32, s: f32, l: f32) -> (f32, f32, f32) {
+    if s == 0.0 {
+        return (l, l, l);
+    }
+
+    let n2 = if l < 0.5 {
+        l * (1.0 + s)
+    } else {
+        l + s - (l * s)
+    };
+
+    let n1 = 2.0 * l - n2;
+    let h = h / 60.0;
+    let r = hue_to_rgb(n1, n2, h + 2.0);
+    let g = hue_to_rgb(n1, n2, h);
+    let b = hue_to_rgb(n1, n2, h - 2.0);
     (r, g, b)
 }
 
-#[cfg(feature = "lab")]
-fn lch_to_rgb(l: f32, c: f32, h: f32) -> (f32, f32, f32) {
-    // Convert LCH to Lab
-    let angle = h * std::f32::consts::PI / 180.0;
-    let a = c * angle.cos();
-    let b = c * angle.sin();
-    
-    // Then use our Lab to RGB conversion
-    lab_to_rgb(l, a, b)
+fn hwb_to_rgb(h: f32, w: f32, b: f32) -> (f32, f32, f32) {
+    let sum = w + b;
+    if sum >= 1.0 {
+        let gray = w / sum;
+        return (gray, gray, gray);
+    }
+
+    let (r, g, b) = hsl_to_rgb(h, 1.0, 0.5);
+    let r = r * (1.0 - w - b) + w;
+    let g = g * (1.0 - w - b) + w;
+    let b = b * (1.0 - w - b) + w;
+    (r, g, b)
+}
+
+fn parse_percentage(s: &str) -> Result<f32, ParseColorError> {
+    if let Some(s) = s.strip_suffix('%') {
+        let v = s.parse::<f32>().map_err(|e| ParseColorError::InvalidNumberFormat(e))?;
+        Ok(v / 100.0)
+                } else {
+        let v = s.parse::<f32>().map_err(|e| ParseColorError::InvalidNumberFormat(e))?;
+        Ok(v)
+    }
+}
+
+fn parse_number(s: &str) -> Result<f32, ParseColorError> {
+    s.parse::<f32>().map_err(|e| ParseColorError::InvalidNumberFormat(e))
+}
+
+fn parse_hue_or_angle(s: &str) -> Result<f32, ParseColorError> {
+    if let Some(s) = s.strip_suffix("deg") {
+        let v = s.parse::<f32>().map_err(|e| ParseColorError::InvalidNumberFormat(e))?;
+        return Ok(v % 360.0);
+    }
+
+    if let Some(s) = s.strip_suffix("rad") {
+        let v = s.parse::<f32>().map_err(|e| ParseColorError::InvalidNumberFormat(e))?;
+        return Ok(v * 180.0 / std::f32::consts::PI);
+    }
+
+    if let Some(s) = s.strip_suffix("grad") {
+        let v = s.parse::<f32>().map_err(|e| ParseColorError::InvalidNumberFormat(e))?;
+        return Ok(v * 0.9);
+    }
+
+    if let Some(s) = s.strip_suffix("turn") {
+        let v = s.parse::<f32>().map_err(|e| ParseColorError::InvalidNumberFormat(e))?;
+        return Ok(v * 360.0);
+    }
+
+    parse_number(s)
+}
+
+fn parse_unit(s: &str) -> Result<(f32, bool), ParseColorError> {
+    if let Some(s) = s.strip_suffix('%') {
+        let v = s.parse::<f32>().map_err(|e| ParseColorError::InvalidNumberFormat(e))?;
+        Ok((v, true))
+    } else {
+        let v = s.parse::<f32>().map_err(|e| ParseColorError::InvalidNumberFormat(e))?;
+        Ok((v, false))
+    }
+}
+
+/// Split color args and parse.
+///
+/// # Examples
+///
+/// ```
+/// // "1, 2, 3, 0.5" => [1, 2, 3], Some(0.5)
+/// // "1 2 3" => [1, 2, 3], None
+/// // "1 2 3 / 0.5" => [1, 2, 3], Some(0.5)
+/// ```
+fn parse_color_args<F, T, E>(
+    s: &str,
+    f: F,
+) -> Result<T, E>
+where
+    F: FnOnce(Vec<&str>, Option<f32>) -> Result<T, E>,
+    E: From<()>,
+{
+    let mut alpha = None;
+
+    // The slash separator: "1 2 3 / 0.5"
+    let mut parts: Vec<&str> = if let Some(i) = s.find('/') {
+        let alpha_str = s[i + 1..].trim();
+        let alpha_value = alpha_str.parse::<f32>().map_err(|_| ())?;
+        alpha = Some(alpha_value.clamp(0.0, 1.0));
+        s[..i].split_whitespace().collect()
+    } else if s.contains(',') {
+        // The comma separator: "1, 2, 3, 0.5"
+        let mut parts: Vec<&str> = s.split(',').collect();
+        if parts.len() == 4 {
+            let alpha_str = parts.pop().unwrap().trim();
+            let alpha_value = alpha_str.parse::<f32>().map_err(|_| ())?;
+            alpha = Some(alpha_value.clamp(0.0, 1.0));
+        }
+        parts
+                } else {
+        // The whitespace separator: "1 2 3"
+        s.split_whitespace().collect()
+    };
+
+    if parts.is_empty() {
+        parts = s.split(',').collect();
+    }
+
+    f(parts, alpha)
+}
+
+#[inline]
+fn clamp01(t: f32) -> f32 {
+    t.clamp(0.0, 1.0)
 }
