@@ -1,112 +1,42 @@
-//! # Overview
+// `csscolors`: A very fast CSS color parser for Rust.
+// Copyright: 2020, Joonas Javanainen <joonas.javanainen@gmail.com>
+// License: MIT/Apache-2.0
+
+//! `bigcolor`: Advanced color manipulation library for Rust.
 //!
-//! Rust library for parsing CSS color string as defined in the W3C's [CSS Color Module Level 4](https://www.w3.org/TR/css-color-4/).
+//! Inspired by TinyColor.js with extended features like CMYK support, blending modes, 
+//! color interpolation, and support for CSS4 color functions.
 //!
-//! ## Supported Color Format
+//! # Examples
 //!
-//! * [Named colors](https://www.w3.org/TR/css-color-4/#named-colors)
-//! * RGB hexadecimal (with and without `#` prefix)
-//!      + Short format `#rgb`
-//!      + Short format with alpha `#rgba`
-//!      + Long format `#rrggbb`
-//!      + Long format with alpha `#rrggbbaa`
-//! * `rgb()` and `rgba()`
-//! * `hsl()` and `hsla()`
-//! * `hwb()`
-//! * `lab()`
-//! * `lch()`
-//! * `hwba()`, `hsv()`, `hsva()` - not in CSS standard.
-//!
-//! ### Example Color Format
-//!
-//! <details>
-//! <summary>Click to expand!</summary>
-//!
-//! ```text
-//! transparent
-//! gold
-//! rebeccapurple
-//! lime
-//! #0f0
-//! #0f0f
-//! #00ff00
-//! #00ff00ff
-//! rgb(0,255,0)
-//! rgb(0% 100% 0%)
-//! rgb(0 255 0 / 100%)
-//! rgba(0,255,0,1)
-//! hsl(120,100%,50%)
-//! hsl(120deg 100% 50%)
-//! hsl(-240 100% 50%)
-//! hsl(-240deg 100% 50%)
-//! hsl(0.3333turn 100% 50%)
-//! hsl(133.333grad 100% 50%)
-//! hsl(2.0944rad 100% 50%)
-//! hsla(120,100%,50%,100%)
-//! hwb(120 0% 0%)
-//! hwb(480deg 0% 0% / 100%)
-//! hsv(120,100%,100%)
-//! hsv(120deg 100% 100% / 100%)
 //! ```
-//! </details>
-//!
-//! ## Usage
-//!
-//! Add this to your `Cargo.toml`
-//!
-//! ```toml
-//! bigcolor = "x.y.z"
+//! # use bigcolor::BigColor;
+//! # use std::str::FromStr;
+//! assert_eq!("#abc", BigColor::from_str("#abc").unwrap().to_hex_string());
+//! assert_eq!("#aabbcc", BigColor::from_str("#aabbcc").unwrap().to_hex_string());
+//! assert_eq!("#11223344", BigColor::from_str("#11223344").unwrap().to_hex_string());
+//! assert_eq!("rgb(1,2,3)", BigColor::from_str("rgb(1, 2, 3)").unwrap().to_rgb_string());
+//! assert_eq!("rgba(1,2,3,0.5)", BigColor::from_str("rgba(1, 2, 3, 0.5)").unwrap().to_rgb_string());
+//! assert_eq!("hsl(1, 2%, 3%)", BigColor::from_str("hsl(1, 2%, 3%)").unwrap().to_hsl_string());
+//! assert_eq!("hsla(1, 2%, 3%, 0.5)", BigColor::from_str("hsla(1, 2%, 3%, 0.5)").unwrap().to_hsl_string());
+//! assert_eq!("#000000", BigColor::from_str("black").unwrap().to_hex_string());
 //! ```
-//!
-//! ## Examples
-//!
-//! Using [`parse()`](fn.parse.html) function to parse a CSS color string.
-//!
-//! ```rust
-//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let c = bigcolor::parse("rgb(100%,0%,0%)")?;
-//!
-//! assert_eq!(c.to_array(), [1.0, 0.0, 0.0, 1.0]);
-//! assert_eq!(c.to_rgba8(), [255, 0, 0, 255]);
-//! assert_eq!(c.to_hex_string(), "#ff0000");
-//! assert_eq!(c.to_rgb_string(), "rgb(255,0,0)");
-//! # Ok(())
-//! # }
-//! ```
-//!
-//! Using `parse()` method on `&str`.
-//!
-//! ```rust
-//! use bigcolor::BigColor;
-//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!
-//! let c = "#ff00007f".parse::<BigColor>()?;
-//!
-//! assert_eq!(c.to_rgba8(), [255, 0, 0, 127]);
-//! assert_eq!(c.to_hex_string(), "#ff00007f");
-//! # Ok(())
-//! # }
-//! ```
-//!
-//! ## Default Feature
-//!
-//! * `named-colors`: Enables parsing from [named colors](https://www.w3.org/TR/css-color-4/#named-colors). Requires [`phf`](https://crates.io/crates/phf).
-//!
-//! ## Optional Features
-//!
-//! * `lab`: Enables parsing `lab()` and `lch()` color format.
-//! * `rust-rgb`: Enables converting from [`rgb`](https://crates.io/crates/rgb) crate types into `BigColor`.
-//! * `cint`: Enables converting [`cint`](https://crates.io/crates/cint) crate types to and from `BigColor`.
-//! * `serde`: Enables serializing (into HEX string) and deserializing (from any supported string color format) using [`serde`](https://serde.rs/) framework.
+
+#[cfg(feature = "lab")]
+extern crate lab;
+
+#[cfg(feature = "lab")]
+extern crate palette;
 
 mod parser;
 mod big_color;
+mod solid;
+mod gradient;
 
 #[cfg(feature = "cint")]
 mod cint;
 
-pub use parser::{parse, ParseColorError};
-pub use big_color::{BigColor, ReadableOptions, BlendMode, InterpolationSpace};
-
-#[cfg(feature = "named-colors")]
-pub use parser::NAMED_COLORS;
+pub use parser::{ParseColorError, NAMED_COLORS};
+pub use big_color::BigColor;
+pub use solid::SolidColor;
+pub use gradient::{Gradient, ColorStop, GradientType, GradientExtend};

@@ -216,3 +216,74 @@ let xyz = BigColor::parse("color(xyz 0.4124 0.2126 0.0193)")?;
 * [csscolorparser](https://github.com/deanm/css-color-parser-js) (Javascript)
 * [TinyColor](https://github.com/bgrins/TinyColor) (Javascript)
 
+## Gradient Support
+
+BigColor now supports CSS gradients, allowing for powerful color manipulation:
+
+```rust
+use bigcolor::{SolidColor, Gradient, ColorStop, GradientExtend};
+
+// Create a linear gradient from red to blue
+let mut stops = Vec::new();
+stops.push(ColorStop::new(SolidColor::new(1.0, 0.0, 0.0, 1.0), 0.0)); // Red at 0%
+stops.push(ColorStop::new(SolidColor::new(0.0, 0.0, 1.0, 1.0), 1.0)); // Blue at 100%
+
+let linear_gradient = Gradient::linear(
+    stops,
+    (0.0, 0.0),
+    (1.0, 1.0),
+    GradientExtend::Pad,
+);
+
+// Create a radial gradient
+let mut stops = Vec::new();
+stops.push(ColorStop::new(SolidColor::new(1.0, 1.0, 0.0, 1.0), 0.0)); // Yellow at center
+stops.push(ColorStop::new(SolidColor::new(1.0, 0.0, 0.0, 1.0), 1.0)); // Red at edge
+
+let radial_gradient = Gradient::radial(
+    stops,
+    (0.5, 0.5), // center
+    0.5,        // radius
+    GradientExtend::Pad,
+);
+
+// Create a conic gradient
+let mut stops = Vec::new();
+stops.push(ColorStop::new(SolidColor::new(1.0, 0.0, 0.0, 1.0), 0.0));   // Red at 0°
+stops.push(ColorStop::new(SolidColor::new(1.0, 1.0, 0.0, 1.0), 0.33));  // Yellow at 120°
+stops.push(ColorStop::new(SolidColor::new(0.0, 0.0, 1.0, 1.0), 0.66));  // Blue at 240°
+stops.push(ColorStop::new(SolidColor::new(1.0, 0.0, 0.0, 1.0), 1.0));   // Red at 360°
+
+let conic_gradient = Gradient::conic(
+    stops,
+    (0.5, 0.5), // center
+    0.0,        // start angle
+    GradientExtend::Pad,
+);
+
+// Parse a CSS gradient string
+let css_gradient = "linear-gradient(to right, red, blue)";
+let gradient = Gradient::from_css_string(css_gradient).unwrap();
+
+// Get color at a specific position along the gradient (0.0 to 1.0)
+let middle_color = gradient.color_at(0.5);
+println!("Color at middle: {}", middle_color.to_hex_string());
+
+// Get a complementary gradient
+let comp_gradient = gradient.complementary();
+```
+
+### Gradient Types
+
+- **Linear Gradients**: Transition colors along a line
+- **Radial Gradients**: Transition colors outward from a center point
+- **Conic Gradients**: Transition colors around a center point
+
+### Gradient Features
+
+- Create gradients with multiple color stops
+- Sample colors at any point along the gradient
+- Parse CSS gradient strings
+- Create complementary gradients
+- Integrate with color manipulation features
+
