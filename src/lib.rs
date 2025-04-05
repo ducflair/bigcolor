@@ -106,7 +106,7 @@ mod big_color;
 mod cint;
 
 pub use parser::{parse, ParseColorError};
-pub use big_color::{BigColor, ReadableOptions};
+pub use big_color::{BigColor, ReadableOptions, BlendMode, InterpolationSpace};
 
 #[cfg(feature = "named-colors")]
 pub use parser::NAMED_COLORS;

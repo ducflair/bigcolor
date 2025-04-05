@@ -20,6 +20,52 @@ pub struct BigColor {
     pub a: f32,
 }
 
+/// Blending mode for color operations
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BlendMode {
+    /// Normal blending (simple alpha compositing)
+    Normal,
+    /// Multiply blending mode (multiplies colors together)
+    Multiply,
+    /// Screen blending mode (inverts, multiplies, then inverts again)
+    Screen,
+    /// Overlay blending mode (combines Multiply and Screen)
+    Overlay,
+    /// Darken blending mode (selects darker of base and blend colors)
+    Darken,
+    /// Lighten blending mode (selects lighter of base and blend colors)
+    Lighten,
+    /// Color-dodge blending mode (brightens base color)
+    ColorDodge,
+    /// Color-burn blending mode (darkens base color)
+    ColorBurn,
+    /// Hard-light blending mode (similar to Overlay, but with blend and base swapped)
+    HardLight,
+    /// Soft-light blending mode (similar to Overlay, but more subtle)
+    SoftLight,
+    /// Difference blending mode (subtracts darker from lighter)
+    Difference,
+    /// Exclusion blending mode (similar to Difference, but with lower contrast)
+    Exclusion,
+}
+
+/// Color space to use for interpolation
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InterpolationSpace {
+    /// RGB interpolation (linear in RGB space)
+    RGB,
+    /// HSL interpolation (linear in HSL space)
+    HSL,
+    /// HSV interpolation (linear in HSV space)
+    HSV,
+    /// LAB interpolation (perceptually linear)
+    LAB,
+    /// LCH interpolation (perceptually linear with better hue interpolation)
+    LCH,
+    /// Oklab interpolation (perceptually uniform)
+    OKLAB,
+}
+
 impl BigColor {
     /// Create a new BigColor instance
     ///
@@ -189,46 +235,87 @@ impl BigColor {
         Self::from_oklaba(l, a, b, alpha)
     }
 
-    #[cfg(feature = "lab")]
     /// Create a new BigColor from Lab values
+    /// 
+    /// - `l`: Lightness [0..100]
+    /// - `a`: A axis [-128..127]
+    /// - `b`: B axis [-128..127]
+    /// - `alpha`: Alpha [0..1]
+    #[cfg(feature = "lab")]
     pub fn from_laba(l: f32, a: f32, b: f32, alpha: f32) -> Self {
-        // Normalize L to 0-1 range
-        let l = l / 100.0;
+        // Normalize values
+        let l = l.clamp(0.0, 100.0);
         
-        // XYZ reference values for D65 illuminant
-        let x_ref = 0.95047;
-        let y_ref = 1.0;
-        let z_ref = 1.08883;
+        // Reference white D65
+        let xn = 0.95047;
+        let yn = 1.0;
+        let zn = 1.08883;
         
         // Convert Lab to XYZ
-        let y = if l > 0.008856 {
-            y_ref * (l + 16.0 / 116.0).powf(3.0)
+        let fy = (l + 16.0) / 116.0;
+        let fx = a / 500.0 + fy;
+        let fz = fy - b / 200.0;
+        
+        let x = if fx.powi(3) > 0.008856 {
+            xn * fx.powi(3)
         } else {
-            y_ref * l / 7.787
+            xn * (fx - 16.0 / 116.0) / 7.787
         };
         
-        let x = x_ref * (a / 500.0 + y / y_ref).powf(3.0);
-        let z = z_ref * (y / y_ref - b / 200.0).powf(3.0);
+        let y = if l > 8.0 {
+            yn * fy.powi(3)
+        } else {
+            yn * l / 903.3
+        };
         
-        // Convert XYZ to sRGB
-        let r = 3.2406 * x - 1.5372 * y - 0.4986 * z;
-        let g = -0.9689 * x + 1.8758 * y + 0.0415 * z;
-        let b = 0.0557 * x - 0.2040 * y + 1.0570 * z;
+        let z = if fz.powi(3) > 0.008856 {
+            zn * fz.powi(3)
+        } else {
+            zn * (fz - 16.0 / 116.0) / 7.787
+        };
+        
+        // XYZ to RGB
+        let r = 3.2404542 * x - 1.5371385 * y - 0.4985314 * z;
+        let g = -0.9692660 * x + 1.8760108 * y + 0.0415560 * z;
+        let b = 0.0556434 * x - 0.2040259 * y + 1.0572252 * z;
         
         // Apply gamma correction
-        let r = if r > 0.0031308 { 1.055 * r.powf(1.0/2.4) - 0.055 } else { 12.92 * r };
-        let g = if g > 0.0031308 { 1.055 * g.powf(1.0/2.4) - 0.055 } else { 12.92 * g };
-        let b = if b > 0.0031308 { 1.055 * b.powf(1.0/2.4) - 0.055 } else { 12.92 * b };
+        let r = if r > 0.0031308 {
+            1.055 * r.powf(1.0 / 2.4) - 0.055
+        } else {
+            12.92 * r
+        };
+        
+        let g = if g > 0.0031308 {
+            1.055 * g.powf(1.0 / 2.4) - 0.055
+        } else {
+            12.92 * g
+        };
+        
+        let b = if b > 0.0031308 {
+            1.055 * b.powf(1.0 / 2.4) - 0.055
+        } else {
+            12.92 * b
+        };
         
         Self::new(r.clamp(0.0, 1.0), g.clamp(0.0, 1.0), b.clamp(0.0, 1.0), alpha)
     }
     
-    #[cfg(feature = "lab")]
     /// Create a new BigColor from LCh values
+    /// 
+    /// - `l`: Lightness [0..100]
+    /// - `c`: Chroma [0..128]
+    /// - `h`: Hue angle [0..360]
+    /// - `alpha`: Alpha [0..1]
+    #[cfg(feature = "lab")]
     pub fn from_lcha(l: f32, c: f32, h: f32, alpha: f32) -> Self {
+        // Normalize hue
+        let h = normalize_angle(h);
+        
         // Convert LCh to Lab
-        let a = c * h.cos();
-        let b = c * h.sin();
+        let h_rad = h * std::f32::consts::PI / 180.0;
+        let a = c * h_rad.cos();
+        let b = c * h_rad.sin();
         
         Self::from_laba(l, a, b, alpha)
     }
@@ -688,6 +775,445 @@ impl BigColor {
             )
         }
     }
+
+    /// Create a new BigColor from CMYK values
+    /// 
+    /// - c, m, y, k are values in the range [0, 1]
+    pub fn from_cmyk(c: f32, m: f32, y: f32, k: f32) -> Self {
+        let c = c.clamp(0.0, 1.0);
+        let m = m.clamp(0.0, 1.0);
+        let y = y.clamp(0.0, 1.0);
+        let k = k.clamp(0.0, 1.0);
+
+        let r = (1.0 - c) * (1.0 - k);
+        let g = (1.0 - m) * (1.0 - k);
+        let b = (1.0 - y) * (1.0 - k);
+
+        Self::new(r, g, b, 1.0)
+    }
+
+    /// Convert color to CMYK values
+    /// 
+    /// Returns [c, m, y, k] where each value is in the range [0, 1]
+    pub fn to_cmyk(&self) -> [f32; 4] {
+        let k = 1.0 - self.r.max(self.g.max(self.b));
+        
+        if k >= 1.0 {
+            return [0.0, 0.0, 0.0, 1.0];
+        }
+        
+        let c = (1.0 - self.r - k) / (1.0 - k);
+        let m = (1.0 - self.g - k) / (1.0 - k);
+        let y = (1.0 - self.b - k) / (1.0 - k);
+        
+        [c.clamp(0.0, 1.0), m.clamp(0.0, 1.0), y.clamp(0.0, 1.0), k.clamp(0.0, 1.0)]
+    }
+
+    /// Get the CSS `cmyk()` format string
+    pub fn to_cmyk_string(&self) -> String {
+        let [c, m, y, k] = self.to_cmyk();
+        
+        let c_pct = (c * 100.0).round() as i32;
+        let m_pct = (m * 100.0).round() as i32;
+        let y_pct = (y * 100.0).round() as i32;
+        let k_pct = (k * 100.0).round() as i32;
+        
+        if self.a < 1.0 {
+            format!("cmyka({}%, {}%, {}%, {}%, {})", 
+                c_pct, m_pct, y_pct, k_pct, 
+                round_to_decimal_places(self.a, 2)
+            )
+        } else {
+            format!("cmyk({}%, {}%, {}%, {}%)", 
+                c_pct, m_pct, y_pct, k_pct
+            )
+        }
+    }
+
+    /// Blend with another color using a specified blending mode
+    ///
+    /// - `color`: The color to blend with
+    /// - `mode`: The blending mode to use
+    /// - `amount`: The blending amount (0-100)
+    ///
+    /// Returns the blended color
+    pub fn blend(&self, color: &BigColor, mode: BlendMode, amount: u8) -> Self {
+        let amount = (amount as f32).min(100.0) / 100.0;
+        
+        // Get the blended RGB values based on the selected mode
+        let (r, g, b) = match mode {
+            BlendMode::Normal => {
+                // Simple linear interpolation for normal blending
+                let r = self.r * (1.0 - amount) + color.r * amount;
+                let g = self.g * (1.0 - amount) + color.g * amount;
+                let b = self.b * (1.0 - amount) + color.b * amount;
+                (r, g, b)
+            },
+            BlendMode::Multiply => {
+                // Multiply blending mode
+                let r = blend_multiply(self.r, color.r, amount);
+                let g = blend_multiply(self.g, color.g, amount);
+                let b = blend_multiply(self.b, color.b, amount);
+                (r, g, b)
+            },
+            BlendMode::Screen => {
+                // Screen blending mode
+                let r = blend_screen(self.r, color.r, amount);
+                let g = blend_screen(self.g, color.g, amount);
+                let b = blend_screen(self.b, color.b, amount);
+                (r, g, b)
+            },
+            BlendMode::Overlay => {
+                // Overlay blending mode
+                let r = blend_overlay(self.r, color.r, amount);
+                let g = blend_overlay(self.g, color.g, amount);
+                let b = blend_overlay(self.b, color.b, amount);
+                (r, g, b)
+            },
+            BlendMode::Darken => {
+                // Darken blending mode
+                let r = blend_darken(self.r, color.r, amount);
+                let g = blend_darken(self.g, color.g, amount);
+                let b = blend_darken(self.b, color.b, amount);
+                (r, g, b)
+            },
+            BlendMode::Lighten => {
+                // Lighten blending mode
+                let r = blend_lighten(self.r, color.r, amount);
+                let g = blend_lighten(self.g, color.g, amount);
+                let b = blend_lighten(self.b, color.b, amount);
+                (r, g, b)
+            },
+            BlendMode::ColorDodge => {
+                // Color-dodge blending mode
+                let r = blend_color_dodge(self.r, color.r, amount);
+                let g = blend_color_dodge(self.g, color.g, amount);
+                let b = blend_color_dodge(self.b, color.b, amount);
+                (r, g, b)
+            },
+            BlendMode::ColorBurn => {
+                // Color-burn blending mode
+                let r = blend_color_burn(self.r, color.r, amount);
+                let g = blend_color_burn(self.g, color.g, amount);
+                let b = blend_color_burn(self.b, color.b, amount);
+                (r, g, b)
+            },
+            BlendMode::HardLight => {
+                // Hard-light blending mode
+                let r = blend_hard_light(self.r, color.r, amount);
+                let g = blend_hard_light(self.g, color.g, amount);
+                let b = blend_hard_light(self.b, color.b, amount);
+                (r, g, b)
+            },
+            BlendMode::SoftLight => {
+                // Soft-light blending mode
+                let r = blend_soft_light(self.r, color.r, amount);
+                let g = blend_soft_light(self.g, color.g, amount);
+                let b = blend_soft_light(self.b, color.b, amount);
+                (r, g, b)
+            },
+            BlendMode::Difference => {
+                // Difference blending mode
+                let r = blend_difference(self.r, color.r, amount);
+                let g = blend_difference(self.g, color.g, amount);
+                let b = blend_difference(self.b, color.b, amount);
+                (r, g, b)
+            },
+            BlendMode::Exclusion => {
+                // Exclusion blending mode
+                let r = blend_exclusion(self.r, color.r, amount);
+                let g = blend_exclusion(self.g, color.g, amount);
+                let b = blend_exclusion(self.b, color.b, amount);
+                (r, g, b)
+            },
+        };
+        
+        // Calculate alpha
+        let a = self.a * (1.0 - amount) + color.a * amount;
+        
+        Self::new(r, g, b, a)
+    }
+
+    /// Interpolate between this color and another color
+    /// 
+    /// - `color`: The target color to interpolate to
+    /// - `amount`: The interpolation amount from 0.0 (this color) to 1.0 (target color)
+    /// - `space`: The color space to perform the interpolation in
+    pub fn interpolate(&self, color: &BigColor, amount: f32, space: InterpolationSpace) -> Self {
+        let t = amount.clamp(0.0, 1.0);
+        
+        match space {
+            InterpolationSpace::RGB => {
+                // Simple linear interpolation in RGB space
+                let r = self.r * (1.0 - t) + color.r * t;
+                let g = self.g * (1.0 - t) + color.g * t;
+                let b = self.b * (1.0 - t) + color.b * t;
+                let a = self.a * (1.0 - t) + color.a * t;
+                
+                Self::new(r, g, b, a)
+            },
+            InterpolationSpace::HSL => {
+                // Interpolation in HSL space
+                let [h1, s1, l1, a1] = self.to_hsla();
+                let [h2, s2, l2, a2] = color.to_hsla();
+                
+                // Handle hue interpolation specially to go the shorter way around the circle
+                let h = interpolate_hue(h1, h2, t);
+                let s = s1 * (1.0 - t) + s2 * t;
+                let l = l1 * (1.0 - t) + l2 * t;
+                let a = a1 * (1.0 - t) + a2 * t;
+                
+                Self::from_hsla(h, s, l, a)
+            },
+            InterpolationSpace::HSV => {
+                // Interpolation in HSV space
+                let [h1, s1, v1, a1] = self.to_hsva();
+                let [h2, s2, v2, a2] = color.to_hsva();
+                
+                // Handle hue interpolation specially to go the shorter way around the circle
+                let h = interpolate_hue(h1, h2, t);
+                let s = s1 * (1.0 - t) + s2 * t;
+                let v = v1 * (1.0 - t) + v2 * t;
+                let a = a1 * (1.0 - t) + a2 * t;
+                
+                Self::from_hsva(h, s, v, a)
+            },
+            #[cfg(feature = "lab")]
+            InterpolationSpace::LAB => {
+                // Convert both colors to Lab space
+                let (l1, a1, b1) = self.to_lab();
+                let (l2, a2, b2) = color.to_lab();
+                
+                // Interpolate in Lab space
+                let l = l1 * (1.0 - t) + l2 * t;
+                let a = a1 * (1.0 - t) + a2 * t;
+                let b = b1 * (1.0 - t) + b2 * t;
+                let alpha = self.a * (1.0 - t) + color.a * t;
+                
+                // Convert back to RGB
+                Self::from_laba(l, a, b, alpha)
+            },
+            #[cfg(feature = "lab")]
+            InterpolationSpace::LCH => {
+                // Convert both colors to LCh space
+                let (l1, c1, h1) = self.to_lch();
+                let (l2, c2, h2) = color.to_lch();
+                
+                // Interpolate in LCh space with special handling for hue
+                let l = l1 * (1.0 - t) + l2 * t;
+                let c = c1 * (1.0 - t) + c2 * t;
+                let h = interpolate_hue(h1, h2, t);
+                let alpha = self.a * (1.0 - t) + color.a * t;
+                
+                // Convert back to RGB
+                Self::from_lcha(l, c, h, alpha)
+            },
+            InterpolationSpace::OKLAB => {
+                // Convert both colors to Oklab space
+                let (l1, a1, b1) = self.to_oklab();
+                let (l2, a2, b2) = color.to_oklab();
+                
+                // Interpolate in Oklab space
+                let l = l1 * (1.0 - t) + l2 * t;
+                let a = a1 * (1.0 - t) + a2 * t;
+                let b = b1 * (1.0 - t) + b2 * t;
+                let alpha = self.a * (1.0 - t) + color.a * t;
+                
+                // Convert back to RGB
+                Self::from_oklaba(l, a, b, alpha)
+            },
+            #[cfg(not(feature = "lab"))]
+            _ => {
+                // Fallback to RGB interpolation if LAB or LCH are not enabled
+                let r = self.r * (1.0 - t) + color.r * t;
+                let g = self.g * (1.0 - t) + color.g * t;
+                let b = self.b * (1.0 - t) + color.b * t;
+                let a = self.a * (1.0 - t) + color.a * t;
+                
+                Self::new(r, g, b, a)
+            },
+        }
+    }
+
+    /// Convert the color to Lab color space
+    /// 
+    /// Returns (L, a, b) where:
+    /// - L: Lightness [0..100]
+    /// - a: A axis [-128..127]
+    /// - b: B axis [-128..127]
+    #[cfg(feature = "lab")]
+    pub fn to_lab(&self) -> (f32, f32, f32) {
+        // Convert to XYZ first
+        let (x, y, z) = self.to_xyz();
+        
+        // XYZ to Lab
+        // Using D65 reference white
+        let xn = 0.95047;
+        let yn = 1.0;
+        let zn = 1.08883;
+        
+        let x = x / xn;
+        let y = y / yn;
+        let z = z / zn;
+        
+        let fx = if x > 0.008856 {
+            x.powf(1.0 / 3.0)
+        } else {
+            (7.787 * x) + (16.0 / 116.0)
+        };
+        
+        let fy = if y > 0.008856 {
+            y.powf(1.0 / 3.0)
+        } else {
+            (7.787 * y) + (16.0 / 116.0)
+        };
+        
+        let fz = if z > 0.008856 {
+            z.powf(1.0 / 3.0)
+        } else {
+            (7.787 * z) + (16.0 / 116.0)
+        };
+        
+        let l = (116.0 * fy) - 16.0;
+        let a = 500.0 * (fx - fy);
+        let b = 200.0 * (fy - fz);
+        
+        (l, a, b)
+    }
+
+    /// Convert the color to LCh color space
+    /// 
+    /// Returns (L, C, h) where:
+    /// - L: Lightness [0..100]
+    /// - C: Chroma [0..128]
+    /// - h: Hue angle [0..360]
+    #[cfg(feature = "lab")]
+    pub fn to_lch(&self) -> (f32, f32, f32) {
+        let (l, a, b) = self.to_lab();
+        
+        let c = (a * a + b * b).sqrt();
+        let mut h = b.atan2(a) * (180.0 / std::f32::consts::PI);
+        
+        if h < 0.0 {
+            h += 360.0;
+        }
+        
+        (l, c, h)
+    }
+
+    /// Convert the color to XYZ color space
+    #[cfg(feature = "lab")]
+    fn to_xyz(&self) -> (f32, f32, f32) {
+        // Convert from sRGB to linear RGB
+        let r_linear = if self.r <= 0.04045 {
+            self.r / 12.92
+        } else {
+            ((self.r + 0.055) / 1.055).powf(2.4)
+        };
+        
+        let g_linear = if self.g <= 0.04045 {
+            self.g / 12.92
+        } else {
+            ((self.g + 0.055) / 1.055).powf(2.4)
+        };
+        
+        let b_linear = if self.b <= 0.04045 {
+            self.b / 12.92
+        } else {
+            ((self.b + 0.055) / 1.055).powf(2.4)
+        };
+        
+        // Linear RGB to XYZ using sRGB/D65 matrix
+        let x = 0.4124564 * r_linear + 0.3575761 * g_linear + 0.1804375 * b_linear;
+        let y = 0.2126729 * r_linear + 0.7151522 * g_linear + 0.0721750 * b_linear;
+        let z = 0.0193339 * r_linear + 0.1191920 * g_linear + 0.9503041 * b_linear;
+        
+        (x, y, z)
+    }
+
+    /// Convert the color to Oklab color space
+    pub fn to_oklab(&self) -> (f32, f32, f32) {
+        // Convert from sRGB to linear RGB
+        let r_linear = if self.r <= 0.04045 {
+            self.r / 12.92
+        } else {
+            ((self.r + 0.055) / 1.055).powf(2.4)
+        };
+        
+        let g_linear = if self.g <= 0.04045 {
+            self.g / 12.92
+        } else {
+            ((self.g + 0.055) / 1.055).powf(2.4)
+        };
+        
+        let b_linear = if self.b <= 0.04045 {
+            self.b / 12.92
+        } else {
+            ((self.b + 0.055) / 1.055).powf(2.4)
+        };
+        
+        // Linear RGB to LMS
+        let l = 0.4122214708 * r_linear + 0.5363325363 * g_linear + 0.0514459929 * b_linear;
+        let m = 0.2119034982 * r_linear + 0.6806995451 * g_linear + 0.1073969566 * b_linear;
+        let s = 0.0883024619 * r_linear + 0.2817188376 * g_linear + 0.6299787005 * b_linear;
+        
+        // LMS to LAB
+        let l_lab = 0.2104542553 * l.powf(1.0/3.0) + 0.7936177850 * m.powf(1.0/3.0) - 0.0040720468 * s.powf(1.0/3.0);
+        let a_lab = 1.9779984951 * l.powf(1.0/3.0) - 2.4285922050 * m.powf(1.0/3.0) + 0.4505937099 * s.powf(1.0/3.0);
+        let b_lab = 0.0259040371 * l.powf(1.0/3.0) + 0.7827717662 * m.powf(1.0/3.0) - 0.8086757660 * s.powf(1.0/3.0);
+        
+        (l_lab, a_lab, b_lab)
+    }
+
+    /// Convert the color to CSS `lab()` format string
+    #[cfg(feature = "lab")]
+    pub fn to_lab_string(&self) -> String {
+        let (l, a, b) = self.to_lab();
+        
+        let l_rounded = l.round() as i32;
+        let a_rounded = a.round() as i32;
+        let b_rounded = b.round() as i32;
+        
+        if self.a < 1.0 {
+            format!("lab({}% {} {} / {})", 
+                l_rounded,
+                a_rounded,
+                b_rounded,
+                round_to_decimal_places(self.a, 2)
+            )
+        } else {
+            format!("lab({}% {} {})", 
+                l_rounded,
+                a_rounded,
+                b_rounded
+            )
+        }
+    }
+    
+    /// Convert the color to CSS `lch()` format string
+    #[cfg(feature = "lab")]
+    pub fn to_lch_string(&self) -> String {
+        let (l, c, h) = self.to_lch();
+        
+        let l_rounded = l.round() as i32;
+        let c_rounded = c.round() as i32;
+        let h_rounded = h.round() as i32;
+        
+        if self.a < 1.0 {
+            format!("lch({}% {} {}deg / {})", 
+                l_rounded,
+                c_rounded,
+                h_rounded,
+                round_to_decimal_places(self.a, 2)
+            )
+        } else {
+            format!("lch({}% {} {}deg)", 
+                l_rounded,
+                c_rounded,
+                h_rounded
+            )
+        }
+    }
 }
 
 /// Options for readability testing
@@ -903,4 +1429,109 @@ fn modulo(x: f32, n: f32) -> f32 {
 fn round_to_decimal_places(value: f32, places: u32) -> f32 {
     let multiplier = 10_f32.powi(places as i32);
     (value * multiplier).round() / multiplier
+}
+
+// Blend functions for individual channels
+fn blend_multiply(base: f32, blend: f32, amount: f32) -> f32 {
+    let result = base * blend;
+    base * (1.0 - amount) + result * amount
+}
+
+fn blend_screen(base: f32, blend: f32, amount: f32) -> f32 {
+    let result = 1.0 - (1.0 - base) * (1.0 - blend);
+    base * (1.0 - amount) + result * amount
+}
+
+fn blend_overlay(base: f32, blend: f32, amount: f32) -> f32 {
+    let result = if base < 0.5 {
+        2.0 * base * blend
+    } else {
+        1.0 - 2.0 * (1.0 - base) * (1.0 - blend)
+    };
+    base * (1.0 - amount) + result * amount
+}
+
+fn blend_darken(base: f32, blend: f32, amount: f32) -> f32 {
+    let result = base.min(blend);
+    base * (1.0 - amount) + result * amount
+}
+
+fn blend_lighten(base: f32, blend: f32, amount: f32) -> f32 {
+    let result = base.max(blend);
+    base * (1.0 - amount) + result * amount
+}
+
+fn blend_color_dodge(base: f32, blend: f32, amount: f32) -> f32 {
+    let result = if blend >= 1.0 {
+        1.0
+    } else if base == 0.0 {
+        0.0
+    } else {
+        (base / (1.0 - blend)).min(1.0)
+    };
+    base * (1.0 - amount) + result * amount
+}
+
+fn blend_color_burn(base: f32, blend: f32, amount: f32) -> f32 {
+    let result = if blend <= 0.0 {
+        0.0
+    } else if base >= 1.0 {
+        1.0
+    } else {
+        1.0 - ((1.0 - base) / blend).min(1.0)
+    };
+    base * (1.0 - amount) + result * amount
+}
+
+fn blend_hard_light(base: f32, blend: f32, amount: f32) -> f32 {
+    let result = if blend < 0.5 {
+        2.0 * base * blend
+    } else {
+        1.0 - 2.0 * (1.0 - base) * (1.0 - blend)
+    };
+    base * (1.0 - amount) + result * amount
+}
+
+fn blend_soft_light(base: f32, blend: f32, amount: f32) -> f32 {
+    let d = if base <= 0.25 {
+        ((16.0 * base - 12.0) * base + 4.0) * base
+    } else {
+        base.sqrt()
+    };
+    
+    let result = if blend <= 0.5 {
+        base - (1.0 - 2.0 * blend) * base * (1.0 - base)
+    } else {
+        base + (2.0 * blend - 1.0) * (d - base)
+    };
+    
+    base * (1.0 - amount) + result * amount
+}
+
+fn blend_difference(base: f32, blend: f32, amount: f32) -> f32 {
+    let result = (base - blend).abs();
+    base * (1.0 - amount) + result * amount
+}
+
+fn blend_exclusion(base: f32, blend: f32, amount: f32) -> f32 {
+    let result = base + blend - 2.0 * base * blend;
+    base * (1.0 - amount) + result * amount
+}
+
+/// Interpolate between two hue angles, taking the shorter path around the color wheel
+fn interpolate_hue(h1: f32, h2: f32, t: f32) -> f32 {
+    let mut delta = h2 - h1;
+    
+    if delta > 180.0 {
+        delta -= 360.0;
+    } else if delta < -180.0 {
+        delta += 360.0;
+    }
+    
+    let h = (h1 + delta * t) % 360.0;
+    if h < 0.0 {
+        h + 360.0
+    } else {
+        h
+    }
 } 

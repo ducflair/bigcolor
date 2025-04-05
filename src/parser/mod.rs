@@ -22,6 +22,7 @@ pub enum ParseColorError {
     InvalidOklab,
     InvalidOklch,
     InvalidFunction,
+    InvalidColorFunc,
     InvalidUnknown,
     InvalidValue,
 }
@@ -41,6 +42,7 @@ impl fmt::Display for ParseColorError {
             Self::InvalidOklab => f.write_str("invalid oklab format"),
             Self::InvalidOklch => f.write_str("invalid oklch format"),
             Self::InvalidFunction => f.write_str("invalid color function"),
+            Self::InvalidColorFunc => f.write_str("invalid color() function"),
             Self::InvalidUnknown => f.write_str("invalid unknown format"),
             Self::InvalidValue => f.write_str("invalid value"),
         }
@@ -122,6 +124,7 @@ pub fn parse(s: &str) -> Result<BigColor, ParseColorError> {
                 "hsv" | "hsva" => return parse_hsv(args),
                 "oklab" | "oklaba" => return parse_oklab(args),
                 "oklch" | "oklcha" => return parse_oklch(args),
+                "color" => return parse_color_function(args),
                 #[cfg(feature = "lab")]
                 "lab" | "laba" => return parse_lab(args),
                 #[cfg(feature = "lab")]
@@ -484,6 +487,116 @@ fn hwb_to_rgb(h: f32, w: f32, b: f32) -> (f32, f32, f32) {
     let g = g * (1.0 - w - b) + w;
     let b = b * (1.0 - w - b) + w;
     (r, g, b)
+}
+
+/// Parse the CSS Color 4 `color()` function
+/// Format: color(colorspace c1 c2 c3[ / alpha])
+/// Examples:
+///   color(srgb 1 0 0)
+///   color(srgb 1 0 0 / 0.5)
+///   color(display-p3 1 0.5 0)
+///   color(a98-rgb 1 0 0)
+///   color(prophoto-rgb 1 0 0)
+///   color(rec2020 1 0 0)
+fn parse_color_function(s: &str) -> Result<BigColor, ParseColorError> {
+    let parts: Vec<&str> = s.split_whitespace().collect();
+    
+    if parts.is_empty() {
+        return Err(ParseColorError::InvalidColorFunc);
+    }
+    
+    // Extract color space
+    let color_space = parts[0];
+    
+    // Extract color components and alpha
+    let mut components = Vec::new();
+    let mut alpha = 1.0;
+    let mut in_alpha = false;
+    
+    for (_, part) in parts.iter().enumerate().skip(1) {
+        if *part == "/" {
+            in_alpha = true;
+            continue;
+        }
+        
+        if in_alpha {
+            // Parse alpha value
+            let trimmed = part.trim_matches(|c: char| c == ',' || c.is_whitespace());
+            alpha = parse_number(trimmed)?;
+            alpha = alpha.clamp(0.0, 1.0);
+            break;
+        } else {
+            // Parse color component
+            let trimmed = part.trim_matches(|c: char| c == ',' || c.is_whitespace());
+            if !trimmed.is_empty() {
+                let value = parse_number(trimmed)?;
+                components.push(value);
+            }
+        }
+    }
+    
+    // Ensure we have enough components
+    if components.len() < 3 {
+        return Err(ParseColorError::InvalidColorFunc);
+    }
+    
+    // Convert to RGB based on color space
+    match color_space {
+        "srgb" => {
+            // sRGB color space (same as our internal representation)
+            let r = components[0].clamp(0.0, 1.0);
+            let g = components[1].clamp(0.0, 1.0);
+            let b = components[2].clamp(0.0, 1.0);
+            Ok(BigColor::new(r, g, b, alpha))
+        },
+        "display-p3" => {
+            // Display P3 color space (approximate conversion)
+            // This is a simplified conversion, a proper implementation would use color profiles
+            let r = 1.0483 * components[0] - 0.0483 * components[1] - 0.0000 * components[2];
+            let g = -0.0000 * components[0] + 1.0121 * components[1] - 0.0121 * components[2];
+            let b = -0.0000 * components[0] - 0.0181 * components[1] + 1.0181 * components[2];
+            Ok(BigColor::new(
+                r.clamp(0.0, 1.0),
+                g.clamp(0.0, 1.0),
+                b.clamp(0.0, 1.0),
+                alpha
+            ))
+        },
+        "a98-rgb" | "prophoto-rgb" | "rec2020" => {
+            // These color spaces have wider gamuts than sRGB
+            // For now, we'll do a simple normalization as an approximation
+            // A proper implementation would use color profiles and proper conversion
+            let r = components[0].clamp(0.0, 1.0);
+            let g = components[1].clamp(0.0, 1.0);
+            let b = components[2].clamp(0.0, 1.0);
+            Ok(BigColor::new(r, g, b, alpha))
+        },
+        "xyz" | "xyz-d50" | "xyz-d65" => {
+            // Convert XYZ to sRGB (approximate D65 conversion)
+            // This is a simplified version, proper implementation would handle different illuminants
+            let x = components[0];
+            let y = components[1];
+            let z = components[2];
+            
+            // XYZ to sRGB matrix (D65)
+            let r =  3.2404542 * x - 1.5371385 * y - 0.4985314 * z;
+            let g = -0.9692660 * x + 1.8760108 * y + 0.0415560 * z;
+            let b =  0.0556434 * x - 0.2040259 * y + 1.0572252 * z;
+            
+            // Apply gamma correction
+            let r = if r <= 0.0031308 { 12.92 * r } else { 1.055 * r.powf(1.0/2.4) - 0.055 };
+            let g = if g <= 0.0031308 { 12.92 * g } else { 1.055 * g.powf(1.0/2.4) - 0.055 };
+            let b = if b <= 0.0031308 { 12.92 * b } else { 1.055 * b.powf(1.0/2.4) - 0.055 };
+            
+            Ok(BigColor::new(
+                r.clamp(0.0, 1.0),
+                g.clamp(0.0, 1.0),
+                b.clamp(0.0, 1.0),
+                alpha
+            ))
+        },
+        _ => Err(ParseColorError::InvalidColorFunc),
+    }
 }
 
 #[cfg(test)]
