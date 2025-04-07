@@ -1,0 +1,17 @@
+[package]
+name = "bigcolor-demo"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+yew = { version = "0.20", features = ["csr"] }
+web-sys = { version = "0.3", features = ["HtmlInputElement", "HtmlTextAreaElement", "HtmlSelectElement", "Navigator", "Clipboard", "Window", "console"] }
+bigcolor = { path = ".." }
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+getrandom = { version = "0.2", features = ["js"] }
+gloo-timers = "0.2"
+indexmap = "1.9.3"
+implicit-clone = "0.3.10"
+js-sys = "0.3"
+regex = "1.9.1"

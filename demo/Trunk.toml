@@ -1,0 +1,15 @@
+[build]
+# Build in release mode
+release = false
+
+[watch]
+# Watch for changes in these directories
+watch = ["src", "index.html", "styles.css"]
+
+[serve]
+# The address to serve on
+address = "127.0.0.1"
+# The port to serve on
+port = 8080
+# Open a browser tab once the server starts
+open = true 

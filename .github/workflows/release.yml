@@ -1,0 +1,138 @@
+name: Build, Test, and Release
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - next
+  pull_request:
+    branches:
+      - main
+      - master
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+  pages: write
+  id-token: write
+
+# Allow one concurrent deployment
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test Rust Library
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust Toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          target: wasm32-unknown-unknown
+      
+      - name: Run tests
+        run: cargo test
+      
+      - name: Generate examples
+        run: |
+          mkdir -p examples/dist
+          cargo run --example svg_conversion
+          
+  pages:
+    name: Deploy Demo App
+    needs: test
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      
+      - name: Update Rust toolchain
+        run: rustup update stable
+      
+      - name: Install Trunk
+        uses: jetli/trunk-action@v0.4.0
+        with:
+          version: 'latest'
+      
+      - name: Install wasm-bindgen-cli
+        run: cargo install wasm-bindgen-cli
+      
+      - name: Build Demo App
+        run: |
+          cd demo
+          trunk build --release
+      
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+      
+      - name: Create deployment directory
+        run: |
+          mkdir -p _site
+          cp -r demo/dist/* _site/
+      
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+      
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+  
+  release:
+    name: Semantic Release
+    needs: [test, pages]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "lts/*"
+      
+      - name: Install dependencies
+        run: npm install
+      
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Update Rust toolchain
+        run: rustup update stable
+      - name: Install cargo-edit
+        run: cargo install cargo-edit
+
+      - name: Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: npx semantic-release
+        
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            target/release/
+            examples/dist/

@@ -1,0 +1,29 @@
+[package]
+name = "bigcolor"
+version = "0.1.0"
+edition = "2021"
+description = "A rust port of tinycolor, a small, fast color manipulation library"
+license = "MIT"
+repository = "https://github.com/yourname/bigcolor"
+keywords = ["color", "rgb", "hsl", "hex", "conversion"]
+categories = ["graphics", "web-programming"]
+exclude = [
+    "tests/**/*",
+    "examples/**/*",
+    "public/**/*",
+    "node_modules/**/*",
+    "demo/**/*",
+]
+
+[lib]
+name = "bigcolor"
+path = "src/lib.rs"
+
+[[example]]
+name = "basic"
+path = "examples/basic.rs"
+
+[dependencies]
+regex = "1.9.1"
+lazy_static = "1.4.0"
+rand = "0.8.5"
