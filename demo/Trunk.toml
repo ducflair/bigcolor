@@ -2,6 +2,9 @@
 # Build in release mode
 release = false
 
+# The public URL path for assets when deployed
+public_url = "/bigcolor/"
+
 [watch]
 # Watch for changes in these directories
 watch = ["src", "index.html", "styles.css"]

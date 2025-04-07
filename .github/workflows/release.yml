@@ -40,57 +40,68 @@ jobs:
       
       - name: Run tests
         run: cargo test
-          
-  pages:
-    name: Deploy Demo App
+
+  build:
+    name: Build Demo App
     needs: test
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
       
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Restore cache
+        uses: actions/cache@v3
         with:
-          targets: wasm32-unknown-unknown
-      
-      - name: Update Rust toolchain
-        run: rustup update stable
+          path: |
+            ~/.cargo/bin
+            ~/.cargo/git
+            ~/.cargo/registry
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       
       - name: Install Trunk
         uses: jetli/trunk-action@v0.4.0
         with:
           version: 'latest'
       
-      - name: Install wasm-bindgen-cli
-        run: cargo install wasm-bindgen-cli
+      - name: Add WASM target
+        run: rustup target add wasm32-unknown-unknown
       
       - name: Build Demo App
         run: |
           cd demo
-          trunk build --release
+          RUSTFLAGS='--cfg getrandom_backend="wasm_js"' trunk build --public-url "/bigcolor" --release
       
       - name: Setup Pages
         uses: actions/configure-pages@v5
       
-      - name: Create deployment directory
-        run: |
-          mkdir -p _site
-          cp -r demo/dist/* _site/
-      
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
-      
+        with:
+          path: "demo/dist"
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    
+    permissions:
+      pages: write
+      id-token: write
+    
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    
+    steps:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
   
   release:
     name: Semantic Release
-    needs: [test, pages]
+    needs: [test, deploy]
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:

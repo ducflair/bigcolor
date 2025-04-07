@@ -1,6 +1,6 @@
 <p align="center">
   <br/>
-  <a target="_blank"><img width="256px" src="public/logo.png" /></a>
+  <a target="_blank"><img width="256px" src="https://github.com/ducflair/bigcolor/blob/main/public/logo.png?raw=true" /></a>
   <p align="center">Rust Color Parser & Manipulation Library</p>
   <p align="center" style="align: center;">
     <a href="https://crates.io/crates/bigcolor/"><img src="https://shields.io/badge/Crates-FFC933?logo=Rust&logoColor=646464&style=round-square" alt="Crates" /></a>
