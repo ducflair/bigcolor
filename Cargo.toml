@@ -1,11 +1,11 @@
 [package]
 name = "bigcolor"
-version = "0.1.0"
+version = "0.0.0-development"
 edition = "2021"
-description = "A rust port of tinycolor, a small, fast color manipulation library"
+description = "A powerful Rust color library for parsing, converting, and manipulating colors across multiple formats"
 license = "MIT"
-repository = "https://github.com/yourname/bigcolor"
-keywords = ["color", "rgb", "hsl", "hex", "conversion"]
+repository = "https://github.com/ducflair/bigcolor"
+keywords = ["color", "rgb", "hsl", "hex", "conversion", "peniko", "contrast"]
 categories = ["graphics", "web-programming"]
 exclude = [
     "tests/**/*",
@@ -27,3 +27,10 @@ path = "examples/basic.rs"
 regex = "1.9.1"
 lazy_static = "1.4.0"
 rand = "0.8.5"
+peniko = "0.3.1"
+
+
+[workspace]
+members = [
+    "demo"
+]

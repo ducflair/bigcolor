@@ -160,6 +160,259 @@ fn convert_colors_in_text(text: &str, target_format: ColorFormat) -> String {
     result
 }
 
+// Add after the ColorPreview struct
+#[derive(Properties, PartialEq)]
+struct ContrastPreviewProps {
+    color: BigColor,
+    intensity: f32,
+}
+
+#[function_component(ContrastPreview)]
+fn contrast_preview(props: &ContrastPreviewProps) -> Html {
+    let contrast_color = props.color.get_contrast_color(props.intensity);
+    let contrast_ratio = props.color.get_contrast_ratio(&contrast_color);
+    let wcag_pass = if contrast_ratio >= 4.5 { "AA" } else if contrast_ratio >= 3.0 { "AA Large" } else { "Fail" };
+    
+    let grid_style = format!("display: grid; grid-template-columns: repeat(auto-fill, minmax(2rem, 1fr)); grid-gap: 2px; padding: 10px; background-color: {};", get_css_compatible_color(&props.color));
+    
+    // Background color copied state
+    let bg_copied = use_state(|| false);
+    let bg_copied_clone = bg_copied.clone();
+    
+    let on_bg_copy = {
+        let color_value = props.color.to_string(None);
+        Callback::from(move |_: MouseEvent| {
+            copy_to_clipboard(&color_value);
+            bg_copied_clone.set(true);
+            
+            let bg_copied_inner = bg_copied_clone.clone();
+            let timeout = Timeout::new(2000, move || {
+                bg_copied_inner.set(false);
+            });
+            timeout.forget();
+        })
+    };
+    
+    // Contrast color copied state
+    let contrast_copied = use_state(|| false);
+    let contrast_copied_clone = contrast_copied.clone();
+    
+    let on_contrast_copy = {
+        let color_value = contrast_color.to_string(None);
+        Callback::from(move |_: MouseEvent| {
+            copy_to_clipboard(&color_value);
+            contrast_copied_clone.set(true);
+            
+            let contrast_copied_inner = contrast_copied_clone.clone();
+            let timeout = Timeout::new(2000, move || {
+                contrast_copied_inner.set(false);
+            });
+            timeout.forget();
+        })
+    };
+    
+    html! {
+        <div class="contrast-preview">
+            <div class="info-section">
+                <div class="info-column">
+                    <span class="info-label">{"Background Color"}</span>
+                    <span 
+                        class={classes!("info-value", "clickable", (*bg_copied).then_some("copied"))}
+                        onclick={on_bg_copy}
+                        title={"Click to copy"}
+                    >
+                        <span 
+                            class="color-swatch" 
+                            style={format!("background-color: {};", get_css_compatible_color(&props.color))}
+                        ></span>
+                        {props.color.to_string(None)}
+                        {
+                            if *bg_copied {
+                                html! { <div class="copy-badge small">{"Copied!"}</div> }
+                            } else {
+                                html! {}
+                            }
+                        }
+                    </span>
+                </div>
+                
+                <div class="info-column">
+                    <span class="info-label">{"Contrast Color"}</span>
+                    <span 
+                        class={classes!("info-value", "clickable", (*contrast_copied).then_some("copied"))}
+                        onclick={on_contrast_copy}
+                        title={"Click to copy"}
+                    >
+                        <span 
+                            class="color-swatch" 
+                            style={format!("background-color: {};", get_css_compatible_color(&contrast_color))}
+                        ></span>
+                        {contrast_color.to_string(None)}
+                        {
+                            if *contrast_copied {
+                                html! { <div class="copy-badge small">{"Copied!"}</div> }
+                            } else {
+                                html! {}
+                            }
+                        }
+                    </span>
+                </div>
+                
+                <div class="info-column">
+                    <span class="info-label">{"Contrast Ratio"}</span>
+                    <span class="info-value">
+                        {format!("{:.2}:1", contrast_ratio)}
+                        <span class="contrast-badge">
+                            {wcag_pass}
+                        </span>
+                    </span>
+                </div>
+            </div>
+            
+            <div class="grid-container" style={grid_style}>
+                {
+                    (0..48).map(|i| {
+                        let cell_style = format!("background-color: {}; width: 2rem; height: 2rem; display: flex; justify-content: center; align-items: center; color: {}; border: 1px solid rgba(0,0,0,0.1);", 
+                            get_css_compatible_color(&props.color), 
+                            get_css_compatible_color(&contrast_color)
+                        );
+                        html! {
+                            <div 
+                                class="grid-cell" 
+                                style={cell_style}
+                                onclick={
+                                    let color_value = contrast_color.to_string(None);
+                                    Callback::from(move |_: MouseEvent| {
+                                        copy_to_clipboard(&color_value);
+                                    })
+                                }
+                                title={"Click to copy contrast color"}
+                            >
+                                {(i+1).to_string()}
+                            </div>
+                        }
+                    }).collect::<Html>()
+                }
+            </div>
+            
+            <div class="text-sample">
+                <div 
+                    style={format!("background-color: {}; padding: 15px; color: {}; cursor: pointer;", 
+                        get_css_compatible_color(&props.color), 
+                        get_css_compatible_color(&contrast_color)
+                    )}
+                    onclick={
+                        let color_value = contrast_color.to_string(None);
+                        Callback::from(move |_: MouseEvent| {
+                            copy_to_clipboard(&color_value);
+                        })
+                    }
+                    title={"Click to copy contrast color"}
+                >
+                    <h3>{"Sample Text with Contrast Color"}</h3>
+                    <p>{"This is an example of text using the contrast color. You can adjust the intensity to see how it affects readability. The contrast ratio is measured according to WCAG guidelines. Click anywhere to copy the contrast color."}</p>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+#[derive(Clone, PartialEq, Properties)]
+pub struct OperationProps {
+    pub operation_name: String,
+    pub color_value: String,
+}
+
+#[function_component(OperationBox)]
+fn operation_box(props: &OperationProps) -> Html {
+    let copied = use_state(|| false);
+    let copied_clone = copied.clone();
+    
+    let onclick = {
+        let color_value = props.color_value.clone();
+        Callback::from(move |_: MouseEvent| {
+            copy_to_clipboard(&color_value);
+            
+            // Show "Copied!" indicator
+            copied_clone.set(true);
+            
+            // Reset after 2 seconds
+            let copied_clone_inner = copied_clone.clone();
+            let timeout = Timeout::new(2000, move || {
+                copied_clone_inner.set(false);
+            });
+            timeout.forget();
+        })
+    };
+    
+    let bg_style = format!("background-color: {}", props.color_value);
+    
+    html! {
+        <div class={classes!("operation-box", (*copied).then_some("copied"))} onclick={onclick}>
+            <div class="operation-name">{ &props.operation_name }</div>
+            <div class="operation-result" style={bg_style}></div>
+            {
+                if *copied {
+                    html! { <div class="copy-badge">{"Copied!"}</div> }
+                } else {
+                    html! {}
+                }
+            }
+        </div>
+    }
+}
+
+// Add a SchemeNameBox component for the schemes section
+#[derive(Clone, PartialEq, Properties)]
+pub struct SchemeNameProps {
+    pub scheme_name: String,
+    pub colors: Vec<BigColor>,
+}
+
+#[function_component(SchemeNameBox)]
+fn scheme_name_box(props: &SchemeNameProps) -> Html {
+    let copied = use_state(|| false);
+    let copied_clone = copied.clone();
+    
+    let onclick = {
+        let colors = props.colors.iter()
+            .map(|c| c.to_string(None))
+            .collect::<Vec<String>>();
+        let json = format!("[{}]", colors.join(", "));
+        
+        Callback::from(move |_: MouseEvent| {
+            copy_to_clipboard(&json);
+            
+            // Show "Copied!" indicator
+            copied_clone.set(true);
+            
+            // Reset after 2 seconds
+            let copied_clone_inner = copied_clone.clone();
+            let timeout = Timeout::new(2000, move || {
+                copied_clone_inner.set(false);
+            });
+            timeout.forget();
+        })
+    };
+    
+    html! {
+        <div 
+            class={classes!("scheme-name", (*copied).then_some("copied"))} 
+            onclick={onclick}
+            title={"Click to copy all colors as JSON"}
+        >
+            { &props.scheme_name }
+            {
+                if *copied {
+                    html! { <div class="copy-badge">{"Copied!"}</div> }
+                } else {
+                    html! {}
+                }
+            }
+        </div>
+    }
+}
+
 #[function_component(App)]
 pub fn app() -> Html {
     let color_input = use_state(|| String::from("#1a6ef5"));
@@ -240,7 +493,7 @@ pub fn app() -> Html {
     // New states for bulk color converter
     let input_text = use_state(|| String::from(""));
     let output_text = use_state(|| String::from(""));
-    let target_format = use_state(|| ColorFormat::RGB);
+    let target_format = use_state(|| ColorFormat::OKLCH);
     
     // Handler for input text change
     let on_input_text_change = {
@@ -288,6 +541,47 @@ pub fn app() -> Html {
         
         Callback::from(move |_: MouseEvent| {
             copy_to_clipboard(&output_text);
+        })
+    };
+    
+    // Add these new state variables
+    let contrast_input_color = use_state(|| String::from("#1a6ef5"));
+    let contrast_intensity = use_state(|| 0.5);
+    let contrast_color = use_state(|| BigColor::new("#1a6ef5"));
+    let contrast_error = use_state(|| false);
+    
+    // Add new callbacks for contrast section
+    let on_contrast_color_change = {
+        let contrast_input_color = contrast_input_color.clone();
+        let contrast_color = contrast_color.clone();
+        let contrast_error = contrast_error.clone();
+        
+        Callback::from(move |e: InputEvent| {
+            if let Some(target) = e.target() {
+                let input: HtmlInputElement = target.dyn_into().unwrap();
+                let value = input.value();
+                contrast_input_color.set(value.clone());
+                
+                let new_color = BigColor::new(&value);
+                if new_color.is_valid() {
+                    contrast_color.set(new_color);
+                    contrast_error.set(false);
+                } else {
+                    contrast_error.set(true);
+                }
+            }
+        })
+    };
+    
+    let on_intensity_change = {
+        let contrast_intensity = contrast_intensity.clone();
+        
+        Callback::from(move |e: InputEvent| {
+            if let Some(target) = e.target() {
+                let input: HtmlInputElement = target.dyn_into().unwrap();
+                let value = input.value().parse::<f32>().unwrap_or(0.5);
+                contrast_intensity.set(value);
+            }
         })
     };
     
@@ -360,22 +654,10 @@ pub fn app() -> Html {
                             <div class="operations-grid">
                                 {
                                     operations.into_iter().map(|(name, value)| {
-                                        let bg_style = format!("background-color: {}", value);
-                                        let color_value = value.clone();
+                                        let name_string = name.to_string(); 
+                                        let value_string = value.clone();
                                         html! {
-                                            <div class="operation-box">
-                                                <div class="operation-name">{ name }</div>
-                                                <div 
-                                                    class="operation-result" 
-                                                    style={bg_style}
-                                                    onclick={
-                                                        let color_value = color_value.clone();
-                                                        Callback::from(move |_: MouseEvent| {
-                                                            copy_to_clipboard(&color_value);
-                                                        })
-                                                    }
-                                                ></div>
-                                            </div>
+                                            <OperationBox operation_name={name_string} color_value={value_string} />
                                         }
                                     }).collect::<Html>()
                                 }
@@ -384,7 +666,21 @@ pub fn app() -> Html {
                             <h2 class="section-title">{ "Color Schemes" }</h2>
                             <div class="schemes-section">
                                 <div class="scheme-box">
-                                    <div class="scheme-name">{ "Analogous" }</div>
+                                    <div 
+                                        class="scheme-name"
+                                        onclick={
+                                            let colors = color.analogous(Some(5), Some(30))
+                                                .iter()
+                                                .map(|c| c.to_string(None))
+                                                .collect::<Vec<String>>();
+                                            let json = format!("[{}]", colors.join(", "));
+                                            
+                                            Callback::from(move |_: MouseEvent| {
+                                                copy_to_clipboard(&json);
+                                            })
+                                        }
+                                        title={"Click to copy all colors as JSON"}
+                                    >{ "Analogous" }</div>
                                     <div class="scheme-colors">
                                         {
                                             color.analogous(Some(5), Some(30)).into_iter().map(|c| {
@@ -400,6 +696,7 @@ pub fn app() -> Html {
                                                                 copy_to_clipboard(&color_value);
                                                             })
                                                         }
+                                                        title={"Click to copy this color"}
                                                     ></div>
                                                 }
                                             }).collect::<Html>()
@@ -408,7 +705,20 @@ pub fn app() -> Html {
                                 </div>
                                 
                                 <div class="scheme-box">
-                                    <div class="scheme-name">{ "Monochromatic" }</div>
+                                    <div 
+                                        class="scheme-name"
+                                        onclick={
+                                            let colors = color.monochromatic(Some(5))
+                                                .iter()
+                                                .map(|c| c.to_string(None))
+                                                .collect::<Vec<String>>();
+                                            let json = format!("[{}]", colors.join(", "));
+                                            Callback::from(move |_: MouseEvent| {
+                                                copy_to_clipboard(&json);
+                                            })
+                                        }
+                                        title={"Click to copy all colors as JSON"}
+                                    >{ "Monochromatic" }</div>
                                     <div class="scheme-colors">
                                         {
                                             color.monochromatic(Some(5)).into_iter().map(|c| {
@@ -424,6 +734,7 @@ pub fn app() -> Html {
                                                                 copy_to_clipboard(&color_value);
                                                             })
                                                         }
+                                                        title={"Click to copy this color"}
                                                     ></div>
                                                 }
                                             }).collect::<Html>()
@@ -432,7 +743,20 @@ pub fn app() -> Html {
                                 </div>
                                 
                                 <div class="scheme-box">
-                                    <div class="scheme-name">{ "Triad" }</div>
+                                    <div 
+                                        class="scheme-name"
+                                        onclick={
+                                            let colors = color.triad()
+                                                .iter()
+                                                .map(|c| c.to_string(None))
+                                                .collect::<Vec<String>>();
+                                            let json = format!("[{}]", colors.join(", "));
+                                            Callback::from(move |_: MouseEvent| {
+                                                copy_to_clipboard(&json);
+                                            })
+                                        }
+                                        title={"Click to copy all colors as JSON"}
+                                    >{ "Triad" }</div>
                                     <div class="scheme-colors">
                                         {
                                             color.triad().into_iter().map(|c| {
@@ -448,6 +772,7 @@ pub fn app() -> Html {
                                                                 copy_to_clipboard(&color_value);
                                                             })
                                                         }
+                                                        title={"Click to copy this color"}
                                                     ></div>
                                                 }
                                             }).collect::<Html>()
@@ -456,7 +781,20 @@ pub fn app() -> Html {
                                 </div>
                                 
                                 <div class="scheme-box">
-                                    <div class="scheme-name">{ "Tetrad" }</div>
+                                    <div 
+                                        class="scheme-name"
+                                        onclick={
+                                            let colors = color.tetrad()
+                                                .iter()
+                                                .map(|c| c.to_string(None))
+                                                .collect::<Vec<String>>();
+                                            let json = format!("[{}]", colors.join(", "));
+                                            Callback::from(move |_: MouseEvent| {
+                                                copy_to_clipboard(&json);
+                                            })
+                                        }
+                                        title={"Click to copy all colors as JSON"}
+                                    >{ "Tetrad" }</div>
                                     <div class="scheme-colors">
                                         {
                                             color.tetrad().into_iter().map(|c| {
@@ -472,6 +810,7 @@ pub fn app() -> Html {
                                                                 copy_to_clipboard(&color_value);
                                                             })
                                                         }
+                                                        title={"Click to copy this color"}
                                                     ></div>
                                                 }
                                             }).collect::<Html>()
@@ -480,7 +819,20 @@ pub fn app() -> Html {
                                 </div>
                                 
                                 <div class="scheme-box">
-                                    <div class="scheme-name">{ "Split Complement" }</div>
+                                    <div 
+                                        class="scheme-name"
+                                        onclick={
+                                            let colors = color.split_complement()
+                                                .iter()
+                                                .map(|c| c.to_string(None))
+                                                .collect::<Vec<String>>();
+                                            let json = format!("[{}]", colors.join(", "));
+                                            Callback::from(move |_: MouseEvent| {
+                                                copy_to_clipboard(&json);
+                                            })
+                                        }
+                                        title={"Click to copy all colors as JSON"}
+                                    >{ "Split Complement" }</div>
                                     <div class="scheme-colors">
                                         {
                                             color.split_complement().into_iter().map(|c| {
@@ -496,6 +848,7 @@ pub fn app() -> Html {
                                                                 copy_to_clipboard(&color_value);
                                                             })
                                                         }
+                                                        title={"Click to copy this color"}
                                                     ></div>
                                                 }
                                             }).collect::<Html>()
@@ -552,10 +905,85 @@ pub fn app() -> Html {
                                     </div>
                                 </div>
                             </div>
+                            
+                            <section class="contrast-section">
+                                <h2 class="section-title">{"Contrast Color Explorer"}</h2>
+                                <p class="section-description">
+                                    {"Test contrast colors with different intensity levels. Find readable text colors for any background."}
+                                </p>
+                                
+                                <div class="contrast-controls">
+                                    <div class="input-group">
+                                        <label for="contrast-color-input">{"Base Color:"}</label>
+                                        <input
+                                            id="contrast-color-input"
+                                            type="text"
+                                            placeholder="Enter a color (e.g. #1a6ef5, rgb(255,0,0))"
+                                            value={(*contrast_input_color).clone()}
+                                            oninput={on_contrast_color_change}
+                                        />
+                                        {
+                                            if *contrast_error {
+                                                html! {
+                                                    <div class="error-message">
+                                                        { format!("'{}' is not a valid color format", *contrast_input_color) }
+                                                    </div>
+                                                }
+                                            } else {
+                                                html! {
+                                                    <div 
+                                                        class="color-sample" 
+                                                        style={format!("background-color: {}", (*contrast_color).to_rgb_string())}
+                                                    ></div>
+                                                }
+                                            }
+                                        }
+                                    </div>
+                                    
+                                    <div class="input-group">
+                                        <label for="intensity-slider">{"Contrast Intensity: "}{format!("{:.2}", *contrast_intensity)}</label>
+                                        <input
+                                            id="intensity-slider"
+                                            type="range"
+                                            min="0"
+                                            max="1"
+                                            step="0.01"
+                                            value={(*contrast_intensity).to_string()}
+                                            oninput={on_intensity_change}
+                                        />
+                                        <span class="intensity-labels">
+                                            <span>{"Low"}</span>
+                                            <span>{"High"}</span>
+                                        </span>
+                                    </div>
+                                </div>
+                                
+                                {
+                                    if !*contrast_error {
+                                        html! {
+                                            <ContrastPreview
+                                                color={(*contrast_color).clone()}
+                                                intensity={*contrast_intensity}
+                                            />
+                                        }
+                                    } else {
+                                        html! {}
+                                    }
+                                }
+                            </section>
                         </>
                     }
                 }
             }
+            
+            <footer>
+                <p>{"BigColor - A Rust Color Manipulation Library"}</p>
+                <div class="footer-links">
+                    <p><a href="https://ducflair.com" target="_blank">{"Ducflair"}</a></p>
+                    <p>{"|"}</p>
+                    <p><a href="https://github.com/ducflair/bigcolor" target="_blank">{"GitHub"}</a></p>
+                </div>
+            </footer>
         </div>
     }
 }

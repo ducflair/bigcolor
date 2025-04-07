@@ -16,26 +16,13 @@ A comprehensive Rust color manipulation library, inspired by [TinyColor](https:/
 
 ## Features
 
-- **Extensive Format Support**
-  - Parse colors from RGB, RGBA, HSL, HSLA, HSV, HSVA, HSB, HSBA, HEX, CMYK, LAB, LCH, OKLAB, OKLCH
-  - Convert between any of these formats easily
-  - Support for named colors (CSS/SVG color keywords)
-  - Space-separated HSL format (e.g. `0 0% 12%`) used in CSS variables
-
-- **Color Manipulation**
-  - Lighten, darken, saturate, desaturate, spin (adjust hue)
-  - Convert to greyscale, complement, invert
-  - Easily get brightness, luminance, and alpha values
-
-- **Color Schemes**
-  - Generate color schemes: analogous, monochromatic, triad, tetrad, split complement
-  - Create harmonious color palettes for design projects
-
-- **Utilities**
-  - Color mixing and blending
-  - WCAG contrast checking
-  - Color readability tools
-  - Bulk text color format conversion
+- **Extensive Color Support**: Parse and manipulate colors in RGB, HSL, HSV, HSB, CMYK, LAB, LCH, OKLAB, OKLCH formats
+- **Flexible Input Parsing**: Accepts various input formats including hex, rgb(), rgba(), hsl(), hsla(), etc.
+- **Color Modifications**: Lighten, darken, saturate, desaturate, greyscale, spin
+- **Color Schemes**: Generate analogous, monochromatic, triad, tetrad, split complement, and complement colors
+- **Contrast Calculation**: Determine contrast ratios according to WCAG standards
+- **Peniko Integration**: Convert to/from the peniko Color library
+- **Bulk Color Conversion**: Convert between formats in large text blocks
 
 ## Installation
 
@@ -46,167 +33,155 @@ Add this to your `Cargo.toml`:
 bigcolor = "0.1.0"
 ```
 
-## Usage Examples
-
-### Basic Color Creation and Conversion
+## Basic Usage
 
 ```rust
 use bigcolor::BigColor;
 
 fn main() {
-    // Create colors from different formats
-    let red_hex = BigColor::new("#ff0000");
-    let blue_name = BigColor::new("blue");
-    let green_rgb = BigColor::new("rgb(0, 255, 0)");
-    let purple_hsl = BigColor::new("hsl(270, 100%, 50%)");
-    let cyan_hsb = BigColor::new("hsb(180, 100%, 100%)");
-    let yellow_cmyk = BigColor::new("cmyk(0%, 0%, 100%, 0%)");
+    // Create colors from various formats
+    let hex_color = BigColor::new("#1a6ef5");
+    let rgb_color = BigColor::new("rgb(255, 0, 0)");
+    let hsl_color = BigColor::new("hsl(120, 100%, 50%)");
+    let rgba_color = BigColor::new("rgba(255, 0, 0, 0.5)");
     
-    // Convert between formats
-    println!("Red as RGB: {}", red_hex.to_rgb_string());          // rgb(255, 0, 0)
-    println!("Blue as HSL: {}", blue_name.to_hsl_string());       // hsl(240, 100%, 50%)
-    println!("Green as HEX: {}", green_rgb.to_hex_string(false)); // #00ff00
-    println!("Purple as HSB: {}", purple_hsl.to_hsb_string());    // hsb(270, 100%, 100%)
-    println!("Cyan as CMYK: {}", cyan_hsb.to_cmyk_string());      // cmyk(100%, 0%, 0%, 0%)
-    println!("Yellow as OKLCH: {}", yellow_cmyk.to_oklch_string()); // oklch(97% 0.2 85)
+    // Convert to different formats
+    println!("As RGB: {}", hex_color.to_rgb_string());
+    println!("As HSL: {}", rgb_color.to_hsl_string());
+    println!("As HEX: {}", hsl_color.to_hex_string(false));
+    println!("As CMYK: {}", rgba_color.to_cmyk_string());
 }
 ```
 
-### Color Modification
+## Color Modification
 
 ```rust
 use bigcolor::BigColor;
 
 fn main() {
-    let color = BigColor::new("#1a6ef5"); // A blue color
+    let mut color = BigColor::new("#1a6ef5");
     
-    // Create variations
-    let mut lighter = color.clone_color();
-    lighter.lighten(Some(20.0));
+    // Modify the color
+    color.lighten(Some(20.0)); // Lighten by 20%
+    println!("Lightened: {}", color.to_hex_string(false));
     
-    let mut darker = color.clone_color();
-    darker.darken(Some(20.0));
+    color = BigColor::new("#1a6ef5"); // Reset
+    color.darken(Some(20.0)); // Darken by 20%
+    println!("Darkened: {}", color.to_hex_string(false));
     
-    let mut more_saturated = color.clone_color();
-    more_saturated.saturate(Some(30.0));
+    color = BigColor::new("#1a6ef5"); // Reset
+    color.saturate(Some(20.0)); // Saturate by 20%
+    println!("Saturated: {}", color.to_hex_string(false));
     
-    let mut complementary = color.clone_color();
-    complementary.complement();
+    color = BigColor::new("#1a6ef5"); // Reset
+    color.desaturate(Some(20.0)); // Desaturate by 20%
+    println!("Desaturated: {}", color.to_hex_string(false));
     
-    println!("Original: {}", color.to_hex_string(false));
-    println!("Lighter: {}", lighter.to_hex_string(false));
-    println!("Darker: {}", darker.to_hex_string(false));
-    println!("More Saturated: {}", more_saturated.to_hex_string(false));
-    println!("Complementary: {}", complementary.to_hex_string(false));
+    color = BigColor::new("#1a6ef5"); // Reset
+    color.greyscale(); // Convert to greyscale
+    println!("Greyscale: {}", color.to_hex_string(false));
 }
 ```
 
-### Color Schemes
+## Color Schemes
 
 ```rust
 use bigcolor::BigColor;
 
 fn main() {
-    let base_color = BigColor::new("#1a6ef5");
+    let color = BigColor::new("#1a6ef5");
     
     // Generate color schemes
-    let analogous = base_color.analogous(Some(5), Some(30));
-    let monochromatic = base_color.monochromatic(Some(5));
-    let triad = base_color.triad();
-    let tetrad = base_color.tetrad();
-    let split_complement = base_color.split_complement();
+    let analogous = color.analogous(Some(5), Some(30));
+    let mono = color.monochromatic(Some(5));
+    let triad = color.triad();
+    let tetrad = color.tetrad();
+    let split = color.split_complement();
     
-    // Print the hex values for the triad scheme
-    println!("Triad color scheme:");
-    for color in triad {
-        println!("  {}", color.to_hex_string(false));
-    }
+    // Print the first color from each scheme
+    println!("Analogous: {}", analogous[0].to_hex_string(false));
+    println!("Monochromatic: {}", mono[0].to_hex_string(false));
+    println!("Triad: {}", triad[0].to_hex_string(false));
+    println!("Tetrad: {}", tetrad[0].to_hex_string(false));
+    println!("Split complement: {}", split[0].to_hex_string(false));
 }
 ```
 
-### Bulk Color Conversion
+## Contrast and Accessibility
 
 ```rust
-use bigcolor::{BigColor, ColorFormat};
-use regex::Regex;
-
-fn convert_colors_in_text(text: &str, target_format: ColorFormat) -> String {
-    // Get a BigColor instance from the library
-    // This is a simplified example - see demo for full implementation
-    let color = BigColor::new("#ff0000");
-    let converted = color.to(target_format);
-    text.replace("#ff0000", &converted)
-}
+use bigcolor::BigColor;
 
 fn main() {
-    let css_code = r#"
-    .header {
-        background-color: #ff0000;
-        color: rgb(255, 255, 255);
-        border: 1px solid hsl(0, 0%, 80%);
-    }
-    "#;
+    let background = BigColor::new("#1a6ef5");
     
-    // Convert all colors to HSL format
-    let result = convert_colors_in_text(css_code, ColorFormat::HSL);
-    println!("Converted CSS:\n{}", result);
+    // Generate contrast colors with different intensities
+    let low_contrast = background.get_contrast_color(0.2);
+    let medium_contrast = background.get_contrast_color(0.5);
+    let high_contrast = background.get_contrast_color(1.0);
+    
+    // Check contrast ratios (WCAG)
+    let ratio_low = background.get_contrast_ratio(&low_contrast);
+    let ratio_medium = background.get_contrast_ratio(&medium_contrast);
+    let ratio_high = background.get_contrast_ratio(&high_contrast);
+    
+    println!("Background: {}", background.to_hex_string(false));
+    println!("Low contrast: {} (Ratio: {:.2}:1)", low_contrast.to_hex_string(false), ratio_low);
+    println!("Medium contrast: {} (Ratio: {:.2}:1)", medium_contrast.to_hex_string(false), ratio_medium);
+    println!("High contrast: {} (Ratio: {:.2}:1)", high_contrast.to_hex_string(false), ratio_high);
+    
+    // Check if background is light or dark
+    println!("Is light color: {}", background.is_light());
 }
 ```
 
-## Demo Application
+## Peniko Integration
 
-A demo web application is available to explore the capabilities of the BigColor library:
+```rust
+use bigcolor::{BigColor, conversion};
+use peniko::Color as PenikoColor;
 
-- Color parsing and conversion
-- Color manipulation and scheme generation
-- Bulk color conversion tool
-- Interactive color previews
+fn main() {
+    // Convert from BigColor to peniko::Color
+    let big_color = BigColor::new("#1a6ef5");
+    let peniko_color = conversion::to_peniko_color(&big_color);
+    
+    // Convert from peniko::Color to BigColor
+    let peniko_red = PenikoColor::from_rgb8(255, 0, 0);
+    let big_red = conversion::from_peniko_color(&peniko_red);
+    
+    println!("Original: {}", big_color.to_hex_string(false));
+    println!("Converted back and forth: {}", big_red.to_hex_string(false));
+}
+```
 
-To run the demo:
+## Supported Input Formats
+
+- **Hex**: `#RGB`, `#RRGGBB`, `#RRGGBBAA`
+- **RGB**: `rgb(r, g, b)`, `rgba(r, g, b, a)`, `rgb(r%, g%, b%)`, `rgba(r%, g%, b%, a)`
+- **HSL**: `hsl(h, s%, l%)`, `hsla(h, s%, l%, a)`, space-separated HSL values
+- **HSV/HSB**: `hsv(h, s%, v%)`, `hsva(h, s%, v%, a)`
+- **CMYK**: `cmyk(c%, m%, y%, k%)`
+- **LAB**: `lab(l, a, b)`
+- **LCH**: `lch(l, c, h)`
+- **OKLAB**: `oklab(l%, a, b)`
+- **OKLCH**: `oklch(l%, c, h)`
+
+## Running the Demo
+
+The project includes a web-based demo that showcases all of BigColor's capabilities:
 
 ```bash
 cd demo
 trunk serve
 ```
 
-Then open your browser to `http://localhost:8080`
-
-## Color Format Support
-
-### Input Formats
-The library accepts the following color formats:
-
-- **Named Colors**: `red`, `blue`, `rebeccapurple`, etc.
-- **Hex**: `#f00`, `#ff0000`, `#ff0000ff`
-- **RGB**: `rgb(255, 0, 0)`, `rgba(255, 0, 0, 0.5)`, `rgb(100%, 0%, 0%)`
-- **HSL**: `hsl(0, 100%, 50%)`, `hsla(0, 100%, 50%, 0.5)`
-- **HSV/HSB**: `hsv(0, 100%, 100%)`, `hsb(0, 100%, 100%)`
-- **CMYK**: `cmyk(0%, 100%, 100%, 0%)`
-- **LAB**: `lab(50, 80, 67)`
-- **LCH**: `lch(50, 80, 20)`
-- **OKLAB**: `oklab(60%, 0.1, 0.2)`
-- **OKLCH**: `oklch(60%, 0.1, 30)`
-- **Space-separated HSL**: `0 0% 12%` (common in CSS variables)
-
-### Output Formats
-Convert to any of these formats using the corresponding method:
-
-```rust
-let color = BigColor::new("#ff0000");
-
-color.to_hex_string(false);    // "#ff0000"
-color.to_rgb_string();         // "rgb(255, 0, 0)"
-color.to_hsl_string();         // "hsl(0, 100%, 50%)"
-color.to_hsv_string();         // "hsv(0, 100%, 100%)"
-color.to_hsb_string();         // "hsb(0, 100%, 100%)"
-color.to_cmyk_string();        // "cmyk(0%, 100%, 100%, 0%)"
-color.to_oklch_string();       // "oklch(63% 0.26 29)"
-```
+Then open your browser to http://localhost:8080
 
 ## License
 
-MIT License - see the LICENSE file for details.
+MIT
 
-## Credits
+## Contributing
 
 This library is partially a port of [TinyColor](https://github.com/bgrins/TinyColor) by Brian Grinstead and inspired by [Color.js](https://github.com/color-js/color.js). 

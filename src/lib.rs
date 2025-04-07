@@ -5,10 +5,14 @@
 mod matrix_utils;
 pub mod color_space;
 mod parse;
+pub mod conversion;
+pub mod accessibility;
 
 use std::fmt;
 use color_space::*;
 use parse::*;
+use crate::accessibility::{get_contrast_color as get_contrast_color_impl, get_contrast_ratio as get_contrast_ratio_impl};
+pub use peniko;
 
 /// BigColor struct represents a color with various formats
 /// Using OKLCH as the foundation
@@ -40,6 +44,15 @@ pub enum ColorFormat {
     CMYK,
     NAME,
     INVALID,
+}
+
+impl PartialEq for BigColor {
+    fn eq(&self, other: &Self) -> bool {
+        self.oklch.l == other.oklch.l &&
+        self.oklch.c == other.oklch.c &&
+        self.oklch.h == other.oklch.h &&
+        self.oklch.alpha == other.oklch.alpha
+    }
 }
 
 impl Default for BigColor {
@@ -731,6 +744,23 @@ impl BigColor {
             ColorFormat::NAME => self.to_name().unwrap_or(&self.original_input).to_string(),
             ColorFormat::INVALID => String::from("invalid"),
         }
+    }
+
+    /// Gets a contrast color with a specified intensity (0.0 to 1.0)
+    /// 
+    /// The intensity parameter controls how strong the contrast will be:
+    /// - 0.0: Minimum contrast (slight difference)
+    /// - 0.5: Medium contrast
+    /// - 1.0: Maximum contrast (black or white)
+    pub fn get_contrast_color(&self, intensity: f32) -> BigColor {
+        get_contrast_color_impl(self, intensity)
+    }
+
+    /// Gets the contrast ratio between this color and another color
+    /// according to WCAG standards. The ratio ranges from 1:1 (no contrast)
+    /// to 21:1 (maximum contrast).
+    pub fn get_contrast_ratio(&self, other: &BigColor) -> f32 {
+        get_contrast_ratio_impl(self, other)
     }
 }
 
