@@ -32,25 +32,27 @@ impl Default for RGBInput {
 }
 
 /// Given a string or object, convert that input to RGB
+/// 
 /// Possible string inputs:
-///
-///     "red"
-///     "#f00" or "f00"
-///     "#ff0000" or "ff0000"
-///     "#ff000000" or "ff000000"
-///     "rgb 255 0 0" or "rgb (255, 0, 0)"
-///     "rgb 1.0 0 0" or "rgb (1, 0, 0)"
-///     "rgba (255, 0, 0, 1)" or "rgba 255, 0, 0, 1"
-///     "rgba (1.0, 0, 0, 1)" or "rgba 1.0, 0, 0, 1"
-///     "hsl(0, 100%, 50%)" or "hsl 0 100% 50%"
-///     "hsla(0, 100%, 50%, 1)" or "hsla 0 100% 50%, 1"
-///     "hsv(0, 100%, 100%)" or "hsv 0 100% 100%"
-///     "lab(50, 50, 0)" or "lab 50 50 0"
-///     "lch(50, 50, 0)" or "lch 50 50 0"
-///     "oklab(50%, 0.1, 0.1)" or "oklab 50% 0.1 0.1"
-///     "oklch(50%, 0.1, 0)" or "oklch 50% 0.1 0"
-///     "cmyk(0%, 0%, 0%, 0%)" or "cmyk 0% 0% 0% 0%"
-///     "cmyk(100%, 100%, 100%, 100%)" or "cmyk 100% 100% 100% 100%"
+/// ```text
+/// "red"
+/// "#f00" or "f00"
+/// "#ff0000" or "ff0000"
+/// "#ff000000" or "ff000000"
+/// "rgb 255 0 0" or "rgb (255, 0, 0)"
+/// "rgb 1.0 0 0" or "rgb (1, 0, 0)"
+/// "rgba (255, 0, 0, 1)" or "rgba 255, 0, 0, 1"
+/// "rgba (1.0, 0, 0, 1)" or "rgba 1.0, 0, 0, 1"
+/// "hsl(0, 100%, 50%)" or "hsl 0 100% 50%"
+/// "hsla(0, 100%, 50%, 1)" or "hsla 0 100% 50%, 1"
+/// "hsv(0, 100%, 100%)" or "hsv 0 100% 100%"
+/// "lab(50, 50, 0)" or "lab 50 50 0"
+/// "lch(50, 50, 0)" or "lch 50 50 0"
+/// "oklab(50%, 0.1, 0.1)" or "oklab 50% 0.1 0.1"
+/// "oklch(50%, 0.1, 0)" or "oklch 50% 0.1 0"
+/// "cmyk(0%, 0%, 0%, 0%)" or "cmyk 0% 0% 0% 0%"
+/// "cmyk(100%, 100%, 100%, 100%)" or "cmyk 100% 100% 100% 100%"
+/// ```
 pub fn input_to_rgb(color: &str) -> RGBInput {
     let mut rgb = RGBInput::default();
 
@@ -730,4 +732,83 @@ pub fn hex_names() -> &'static HashMap<String, &'static str> {
         };
     }
     &HEX_NAMES
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_color_name() {
+        let rgb = input_to_rgb("red");
+        assert_eq!(rgb.r, 255);
+        assert_eq!(rgb.g, 0);
+        assert_eq!(rgb.b, 0);
+        assert_eq!(rgb.a, 1.0);
+        assert_eq!(rgb.format, ColorFormat::NAME);
+    }
+
+    #[test]
+    fn test_hex_colors() {
+        let rgb = input_to_rgb("#f00");
+        assert_eq!(rgb.r, 255);
+        assert_eq!(rgb.g, 0);
+        assert_eq!(rgb.b, 0);
+        assert_eq!(rgb.format, ColorFormat::HEX);
+
+        let rgb = input_to_rgb("#ff0000");
+        assert_eq!(rgb.r, 255);
+        assert_eq!(rgb.g, 0);
+        assert_eq!(rgb.b, 0);
+        assert_eq!(rgb.format, ColorFormat::HEX);
+    }
+
+    #[test]
+    fn test_rgb_formats() {
+        let rgb = input_to_rgb("rgb(255, 0, 0)");
+        assert_eq!(rgb.r, 255);
+        assert_eq!(rgb.g, 0);
+        assert_eq!(rgb.b, 0);
+        assert_eq!(rgb.format, ColorFormat::RGB);
+
+        let rgb = input_to_rgb("rgb(100%, 0%, 0%)");
+        assert_eq!(rgb.r, 255);
+        assert_eq!(rgb.g, 0);
+        assert_eq!(rgb.b, 0);
+        assert_eq!(rgb.format, ColorFormat::RGB);
+    }
+
+    #[test]
+    fn test_hsl_formats() {
+        let rgb = input_to_rgb("hsl(0, 100%, 50%)");
+        assert_eq!(rgb.r, 255);
+        assert_eq!(rgb.g, 0);
+        assert_eq!(rgb.b, 0);
+        assert_eq!(rgb.format, ColorFormat::HSL);
+
+        // Test space-separated format
+        let rgb = input_to_rgb("0 100% 50%");
+        assert_eq!(rgb.r, 255);
+        assert_eq!(rgb.g, 0);
+        assert_eq!(rgb.b, 0);
+        assert_eq!(rgb.format, ColorFormat::HSL);
+    }
+
+    #[test]
+    fn test_hsv_formats() {
+        let rgb = input_to_rgb("hsv(0, 100%, 100%)");
+        assert_eq!(rgb.r, 255);
+        assert_eq!(rgb.g, 0);
+        assert_eq!(rgb.b, 0);
+        assert_eq!(rgb.format, ColorFormat::HSV);
+    }
+
+    #[test]
+    fn test_cmyk_format() {
+        let rgb = input_to_rgb("cmyk(0%, 100%, 100%, 0%)");
+        assert_eq!(rgb.r, 255);
+        assert_eq!(rgb.g, 0);
+        assert_eq!(rgb.b, 0);
+        assert_eq!(rgb.format, ColorFormat::CMYK);
+    }
 } 
