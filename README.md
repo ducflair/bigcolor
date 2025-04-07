@@ -24,14 +24,6 @@ A comprehensive Rust color manipulation library, inspired by [TinyColor](https:/
 - **Peniko Integration**: Convert to/from the peniko Color library
 - **Bulk Color Conversion**: Convert between formats in large text blocks
 
-## Installation
-
-Add this to your `Cargo.toml`:
-
-```toml
-[dependencies]
-bigcolor = "0.1.0"
-```
 
 ## Basic Usage
 
