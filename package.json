@@ -5,7 +5,7 @@
   "scripts": {
     "test": "cargo test",
     "build": "cargo build",
-    "demo": "cd demo && trunk serve --port 8250 --open"
+    "demo": "cd demo && trunk serve --port 8252 --open"
   },
   "devDependencies": {
     "@semantic-release/commit-analyzer": "13.0.1",
