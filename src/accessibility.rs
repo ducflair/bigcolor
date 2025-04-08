@@ -64,15 +64,17 @@ pub fn get_contrast_ratio(color1: &BigColor, color2: &BigColor) -> f32 {
     (lighter + 0.05) / (darker + 0.05)
 }
 
-/// Calculates luminance according to WCAG formula
-/// This is a helper function used by get_contrast_ratio
-fn calculate_luminance(color: &BigColor) -> f32 {
-    color.get_luminance()
+/// Calculate the relative luminance of a color
+pub fn calculate_luminance(color: &BigColor) -> f32 {
+    let rgb = color.to_rgb();
+    let r = to_linear(rgb.r as f32 / 255.0) * 0.2126;
+    let g = to_linear(rgb.g as f32 / 255.0) * 0.7152;
+    let b = to_linear(rgb.b as f32 / 255.0) * 0.0722;
+    r + g + b
 }
 
-/// Converts an sRGB color component to linear RGB
-/// This is a helper function for luminance calculations
-fn to_linear(component: f32) -> f32 {
+/// Convert sRGB component to linear RGB
+pub fn to_linear(component: f32) -> f32 {
     if component <= 0.03928 {
         component / 12.92
     } else {

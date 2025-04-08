@@ -103,8 +103,8 @@ fn convert_colors_in_text(text: &str, target_format: ColorFormat) -> String {
         r"hsl\s*\(\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)%\s*,\s*(\d+(?:\.\d+)?)%\s*\)",
         r"hsla\s*\(\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)%\s*,\s*(\d+(?:\.\d+)?)%\s*,\s*([01]?\.?\d*)\s*\)",
         // Space-separated HSL (like in CSS variables)
-        r"(\b0\b|\b[1-9]\d*\b)\s+(\b0\b|\b[1-9]\d*\b)%\s+(\b0\b|\b[1-9]\d*\b)%",
-        r"\s(\d+)\s+(\d+)%\s+(\d+)%\s",
+        r"(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)%\s+(\d+(?:\.\d+)?)%",
+        r":\s*(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)%\s+(\d+(?:\.\d+)?)%",
         // HSV/HSB colors
         r"hsv\s*\(\s*(\d+)\s*,\s*(\d+)%\s*,\s*(\d+)%\s*\)",
         r"hsva\s*\(\s*(\d+)\s*,\s*(\d+)%\s*,\s*(\d+)%\s*,\s*([01]?\.?\d*)\s*\)",
@@ -121,6 +121,7 @@ fn convert_colors_in_text(text: &str, target_format: ColorFormat) -> String {
         // OKLCH colors
         r"oklch\s*\(\s*(\d+(?:\.\d+)?)%\s*,?\s*(\d+(?:\.\d+)?)\s*,?\s*(\d+(?:\.\d+)?)\s*\)",
         r"oklch\s*\(\s*(\d*\.?\d+)\s+(\d*\.?\d+)\s+(\d+(?:\.\d+)?)\s*\)",
+        r"oklch\s*\(\s*(\d+(?:\.\d+)?)%\s+(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)\s*\)",
     ];
     
     let mut result = text.to_string();
@@ -135,7 +136,7 @@ fn convert_colors_in_text(text: &str, target_format: ColorFormat) -> String {
             let color_str = &result[start..end];
             
             // Special handling for space-separated HSL
-            let color = if pattern.contains("\\b0\\b|\\b[1-9]") || pattern.contains("\\s(\\d+)") {
+            let color = if pattern.contains("\\s+(\\d+(?:\\.")  && !pattern.contains("oklch") && !pattern.contains("rgb") && !pattern.contains("hsl\\s*\\(") {
                 // Convert space-separated HSL to standard HSL format
                 let caps = regex.captures(color_str).unwrap();
                 let h = caps.get(1).map_or("0", |m| m.as_str());
@@ -413,6 +414,74 @@ fn scheme_name_box(props: &SchemeNameProps) -> Html {
     }
 }
 
+#[derive(Clone, PartialEq, Properties)]
+pub struct SchemeBoxProps {
+    pub scheme_name: String,
+    pub colors: Vec<BigColor>,
+}
+
+#[function_component(SchemeBox)]
+fn scheme_box(props: &SchemeBoxProps) -> Html {
+    let copied = use_state(|| false);
+    let copied_clone = copied.clone();
+    
+    let onclick = {
+        let colors = props.colors.iter()
+            .map(|c| c.to_string(None))
+            .collect::<Vec<String>>();
+        let json = format!("[{}]", colors.join(", "));
+        
+        Callback::from(move |_: MouseEvent| {
+            copy_to_clipboard(&json);
+            
+            // Show "Copied!" indicator
+            copied_clone.set(true);
+            
+            // Reset after 2 seconds
+            let copied_clone_inner = copied_clone.clone();
+            let timeout = Timeout::new(2000, move || {
+                copied_clone_inner.set(false);
+            });
+            timeout.forget();
+        })
+    };
+    
+    html! {
+        <div class={classes!("scheme-box", (*copied).then_some("copied"))} onclick={onclick}>
+            <div class="scheme-name">{ &props.scheme_name }</div>
+            <div class="scheme-colors">
+                {
+                    props.colors.iter().map(|c| {
+                        let bg_style = format!("background-color: {}", get_css_compatible_color(&c));
+                        let color_value = c.to_string(None);
+                        html! {
+                            <div 
+                                class="scheme-color" 
+                                style={bg_style}
+                                onclick={
+                                    let color_value = color_value.clone();
+                                    Callback::from(move |e: MouseEvent| {
+                                        e.stop_propagation();  // Prevent triggering parent's onclick
+                                        copy_to_clipboard(&color_value);
+                                    })
+                                }
+                                title={"Click to copy this color"}
+                            ></div>
+                        }
+                    }).collect::<Html>()
+                }
+            </div>
+            {
+                if *copied {
+                    html! { <div class="copy-badge">{"Copied!"}</div> }
+                } else {
+                    html! {}
+                }
+            }
+        </div>
+    }
+}
+
 #[function_component(App)]
 pub fn app() -> Html {
     let color_input = use_state(|| String::from("#1a6ef5"));
@@ -535,12 +604,26 @@ pub fn app() -> Html {
         })
     };
     
-    // Copy output text
+    // Copy output text with feedback
+    let output_copied = use_state(|| false);
+    let output_copied_clone = output_copied.clone();
+
     let on_copy_output = {
         let output_text = output_text.clone();
+        let output_copied = output_copied_clone.clone();
         
         Callback::from(move |_: MouseEvent| {
             copy_to_clipboard(&output_text);
+            
+            // Show "Copied!" indicator
+            output_copied.set(true);
+            
+            // Reset after 2 seconds
+            let output_copied_inner = output_copied.clone();
+            let timeout = Timeout::new(2000, move || {
+                output_copied_inner.set(false);
+            });
+            timeout.forget();
         })
     };
     
@@ -665,196 +748,26 @@ pub fn app() -> Html {
                             
                             <h2 class="section-title">{ "Color Schemes" }</h2>
                             <div class="schemes-section">
-                                <div class="scheme-box">
-                                    <div 
-                                        class="scheme-name"
-                                        onclick={
-                                            let colors = color.analogous(Some(5), Some(30))
-                                                .iter()
-                                                .map(|c| c.to_string(None))
-                                                .collect::<Vec<String>>();
-                                            let json = format!("[{}]", colors.join(", "));
-                                            
-                                            Callback::from(move |_: MouseEvent| {
-                                                copy_to_clipboard(&json);
-                                            })
-                                        }
-                                        title={"Click to copy all colors as JSON"}
-                                    >{ "Analogous" }</div>
-                                    <div class="scheme-colors">
-                                        {
-                                            color.analogous(Some(5), Some(30)).into_iter().map(|c| {
-                                                let bg_style = format!("background-color: {}", get_css_compatible_color(&c));
-                                                let color_value = c.to_string(None);
-                                                html! {
-                                                    <div 
-                                                        class="scheme-color" 
-                                                        style={bg_style}
-                                                        onclick={
-                                                            let color_value = color_value.clone();
-                                                            Callback::from(move |_: MouseEvent| {
-                                                                copy_to_clipboard(&color_value);
-                                                            })
-                                                        }
-                                                        title={"Click to copy this color"}
-                                                    ></div>
-                                                }
-                                            }).collect::<Html>()
-                                        }
-                                    </div>
-                                </div>
-                                
-                                <div class="scheme-box">
-                                    <div 
-                                        class="scheme-name"
-                                        onclick={
-                                            let colors = color.monochromatic(Some(5))
-                                                .iter()
-                                                .map(|c| c.to_string(None))
-                                                .collect::<Vec<String>>();
-                                            let json = format!("[{}]", colors.join(", "));
-                                            Callback::from(move |_: MouseEvent| {
-                                                copy_to_clipboard(&json);
-                                            })
-                                        }
-                                        title={"Click to copy all colors as JSON"}
-                                    >{ "Monochromatic" }</div>
-                                    <div class="scheme-colors">
-                                        {
-                                            color.monochromatic(Some(5)).into_iter().map(|c| {
-                                                let bg_style = format!("background-color: {}", get_css_compatible_color(&c));
-                                                let color_value = c.to_string(None);
-                                                html! {
-                                                    <div 
-                                                        class="scheme-color" 
-                                                        style={bg_style}
-                                                        onclick={
-                                                            let color_value = color_value.clone();
-                                                            Callback::from(move |_: MouseEvent| {
-                                                                copy_to_clipboard(&color_value);
-                                                            })
-                                                        }
-                                                        title={"Click to copy this color"}
-                                                    ></div>
-                                                }
-                                            }).collect::<Html>()
-                                        }
-                                    </div>
-                                </div>
-                                
-                                <div class="scheme-box">
-                                    <div 
-                                        class="scheme-name"
-                                        onclick={
-                                            let colors = color.triad()
-                                                .iter()
-                                                .map(|c| c.to_string(None))
-                                                .collect::<Vec<String>>();
-                                            let json = format!("[{}]", colors.join(", "));
-                                            Callback::from(move |_: MouseEvent| {
-                                                copy_to_clipboard(&json);
-                                            })
-                                        }
-                                        title={"Click to copy all colors as JSON"}
-                                    >{ "Triad" }</div>
-                                    <div class="scheme-colors">
-                                        {
-                                            color.triad().into_iter().map(|c| {
-                                                let bg_style = format!("background-color: {}", get_css_compatible_color(&c));
-                                                let color_value = c.to_string(None);
-                                                html! {
-                                                    <div 
-                                                        class="scheme-color" 
-                                                        style={bg_style}
-                                                        onclick={
-                                                            let color_value = color_value.clone();
-                                                            Callback::from(move |_: MouseEvent| {
-                                                                copy_to_clipboard(&color_value);
-                                                            })
-                                                        }
-                                                        title={"Click to copy this color"}
-                                                    ></div>
-                                                }
-                                            }).collect::<Html>()
-                                        }
-                                    </div>
-                                </div>
-                                
-                                <div class="scheme-box">
-                                    <div 
-                                        class="scheme-name"
-                                        onclick={
-                                            let colors = color.tetrad()
-                                                .iter()
-                                                .map(|c| c.to_string(None))
-                                                .collect::<Vec<String>>();
-                                            let json = format!("[{}]", colors.join(", "));
-                                            Callback::from(move |_: MouseEvent| {
-                                                copy_to_clipboard(&json);
-                                            })
-                                        }
-                                        title={"Click to copy all colors as JSON"}
-                                    >{ "Tetrad" }</div>
-                                    <div class="scheme-colors">
-                                        {
-                                            color.tetrad().into_iter().map(|c| {
-                                                let bg_style = format!("background-color: {}", get_css_compatible_color(&c));
-                                                let color_value = c.to_string(None);
-                                                html! {
-                                                    <div 
-                                                        class="scheme-color" 
-                                                        style={bg_style}
-                                                        onclick={
-                                                            let color_value = color_value.clone();
-                                                            Callback::from(move |_: MouseEvent| {
-                                                                copy_to_clipboard(&color_value);
-                                                            })
-                                                        }
-                                                        title={"Click to copy this color"}
-                                                    ></div>
-                                                }
-                                            }).collect::<Html>()
-                                        }
-                                    </div>
-                                </div>
-                                
-                                <div class="scheme-box">
-                                    <div 
-                                        class="scheme-name"
-                                        onclick={
-                                            let colors = color.split_complement()
-                                                .iter()
-                                                .map(|c| c.to_string(None))
-                                                .collect::<Vec<String>>();
-                                            let json = format!("[{}]", colors.join(", "));
-                                            Callback::from(move |_: MouseEvent| {
-                                                copy_to_clipboard(&json);
-                                            })
-                                        }
-                                        title={"Click to copy all colors as JSON"}
-                                    >{ "Split Complement" }</div>
-                                    <div class="scheme-colors">
-                                        {
-                                            color.split_complement().into_iter().map(|c| {
-                                                let bg_style = format!("background-color: {}", get_css_compatible_color(&c));
-                                                let color_value = c.to_string(None);
-                                                html! {
-                                                    <div 
-                                                        class="scheme-color" 
-                                                        style={bg_style}
-                                                        onclick={
-                                                            let color_value = color_value.clone();
-                                                            Callback::from(move |_: MouseEvent| {
-                                                                copy_to_clipboard(&color_value);
-                                                            })
-                                                        }
-                                                        title={"Click to copy this color"}
-                                                    ></div>
-                                                }
-                                            }).collect::<Html>()
-                                        }
-                                    </div>
-                                </div>
+                                <SchemeBox 
+                                    scheme_name="Analogous" 
+                                    colors={color.analogous(Some(5), Some(30))} 
+                                />
+                                <SchemeBox 
+                                    scheme_name="Monochromatic" 
+                                    colors={color.monochromatic(Some(5))} 
+                                />
+                                <SchemeBox 
+                                    scheme_name="Triad" 
+                                    colors={color.triad()} 
+                                />
+                                <SchemeBox 
+                                    scheme_name="Tetrad" 
+                                    colors={color.tetrad()} 
+                                />
+                                <SchemeBox 
+                                    scheme_name="Split Complement" 
+                                    colors={color.split_complement()} 
+                                />
                             </div>
                             
                             <h2 class="section-title">{ "Bulk Color Converter" }</h2>
@@ -894,8 +807,14 @@ pub fn app() -> Html {
                                         {
                                             if !output_text.is_empty() {
                                                 html! {
-                                                    <button class="copy-button" onclick={on_copy_output}>
-                                                        { "Copy Result" }
+                                                    <button class={classes!("copy-button", (*output_copied).then_some("copied"))} onclick={on_copy_output}>
+                                                        { 
+                                                            if *output_copied {
+                                                                "Copied!"
+                                                            } else {
+                                                                "Copy Result"
+                                                            }
+                                                        }
                                                     </button>
                                                 }
                                             } else {

@@ -42,7 +42,7 @@ pub struct PercentageRGB {
 
 /// XYZ D65 color space
 #[derive(Debug, Clone, Copy)]
-pub struct XYZ_D65 {
+pub struct XyzD65 {
     pub x: f32,
     pub y: f32,
     pub z: f32,
@@ -51,7 +51,7 @@ pub struct XYZ_D65 {
 
 /// XYZ D50 color space
 #[derive(Debug, Clone, Copy)]
-pub struct XYZ_D50 {
+pub struct XyzD50 {
     pub x: f32,
     pub y: f32,
     pub z: f32,
@@ -128,7 +128,7 @@ pub fn rgb_to_hsl(r: u8, g: u8, b: u8) -> HSL {
     let max = r.max(g).max(b);
     let min = r.min(g).min(b);
     let mut h = 0.0;
-    let mut s = 0.0;
+    let s;
     let l = (max + min) / 2.0;
 
     if max == min {
@@ -218,7 +218,7 @@ pub fn rgb_to_hsv(r: u8, g: u8, b: u8) -> HSV {
     let max = r_norm.max(g_norm).max(b_norm);
     let min = r_norm.min(g_norm).min(b_norm);
     let mut h = 0.0;
-    let mut s = 0.0;
+    let s;
     let v = max;
 
     let d = max - min;
@@ -367,7 +367,7 @@ const EPSILON3: f32 = 24.0 / 116.0;
 const KAPPA: f32 = 24389.0 / 27.0; // 29^3/3^3
 
 /// Convert RGB to XYZ D65
-pub fn rgb_to_xyz_d65(r: u8, g: u8, b: u8, a: f32) -> XYZ_D65 {
+pub fn rgb_to_xyz_d65(r: u8, g: u8, b: u8, a: f32) -> XyzD65 {
     // sRGB to linear RGB
     let r_linear = srgb_to_linear(r as f32 / 255.0);
     let g_linear = srgb_to_linear(g as f32 / 255.0);
@@ -381,7 +381,7 @@ pub fn rgb_to_xyz_d65(r: u8, g: u8, b: u8, a: f32) -> XYZ_D65 {
         0.0193339 * r_linear + 0.1191920 * g_linear + 0.9503041 * b_linear,
     ];
 
-    XYZ_D65 {
+    XyzD65 {
         x: xyz[0],
         y: xyz[1],
         z: xyz[2],
@@ -390,7 +390,7 @@ pub fn rgb_to_xyz_d65(r: u8, g: u8, b: u8, a: f32) -> XYZ_D65 {
 }
 
 /// Convert XYZ D65 to RGB
-pub fn xyz_d65_to_rgb(xyz: XYZ_D65) -> (u8, u8, u8, f32) {
+pub fn xyz_d65_to_rgb(xyz: XyzD65) -> (u8, u8, u8, f32) {
     let rgb_linear = [
         3.2404542 * xyz.x - 1.5371385 * xyz.y - 0.4985314 * xyz.z,
         -0.9692660 * xyz.x + 1.8760108 * xyz.y + 0.0415560 * xyz.z,
@@ -406,11 +406,11 @@ pub fn xyz_d65_to_rgb(xyz: XYZ_D65) -> (u8, u8, u8, f32) {
 }
 
 /// Convert XYZ D65 to XYZ D50
-pub fn xyz_d65_to_xyz_d50(xyz: XYZ_D65) -> XYZ_D50 {
+pub fn xyz_d65_to_xyz_d50(xyz: XyzD65) -> XyzD50 {
     let xyz_vec = [xyz.x, xyz.y, xyz.z];
     let xyz_d50 = adapt_xyz(xyz_vec, WHITE_D65, WHITE_D50);
     
-    XYZ_D50 {
+    XyzD50 {
         x: xyz_d50[0],
         y: xyz_d50[1],
         z: xyz_d50[2],
@@ -419,11 +419,11 @@ pub fn xyz_d65_to_xyz_d50(xyz: XYZ_D65) -> XYZ_D50 {
 }
 
 /// Convert XYZ D50 to XYZ D65
-pub fn xyz_d50_to_xyz_d65(xyz: XYZ_D50) -> XYZ_D65 {
+pub fn xyz_d50_to_xyz_d65(xyz: XyzD50) -> XyzD65 {
     let xyz_vec = [xyz.x, xyz.y, xyz.z];
     let xyz_d65 = adapt_xyz(xyz_vec, WHITE_D50, WHITE_D65);
     
-    XYZ_D65 {
+    XyzD65 {
         x: xyz_d65[0],
         y: xyz_d65[1],
         z: xyz_d65[2],
@@ -432,7 +432,7 @@ pub fn xyz_d50_to_xyz_d65(xyz: XYZ_D50) -> XYZ_D65 {
 }
 
 /// Convert XYZ D50 to Lab
-pub fn xyz_d50_to_lab(xyz: XYZ_D50) -> Lab {
+pub fn xyz_d50_to_lab(xyz: XyzD50) -> Lab {
     // Scale relative to D50 white point
     let xyz_rel = [
         xyz.x / WHITE_D50[0],
@@ -462,7 +462,7 @@ pub fn xyz_d50_to_lab(xyz: XYZ_D50) -> Lab {
 }
 
 /// Convert Lab to XYZ D50
-pub fn lab_to_xyz_d50(lab: Lab) -> XYZ_D50 {
+pub fn lab_to_xyz_d50(lab: Lab) -> XyzD50 {
     // Calculate f
     let f1 = (lab.l + 16.0) / 116.0;
     let f0 = lab.a / 500.0 + f1;
@@ -480,7 +480,7 @@ pub fn lab_to_xyz_d50(lab: Lab) -> XYZ_D50 {
     let y = xyz_rel[1] * WHITE_D50[1];
     let z = xyz_rel[2] * WHITE_D50[2];
     
-    XYZ_D50 {
+    XyzD50 {
         x,
         y,
         z,
@@ -526,7 +526,7 @@ pub fn lch_to_lab(lch: LCH) -> Lab {
 }
 
 /// Convert XYZ D65 to OKLab
-pub fn xyz_d65_to_oklab(xyz: XYZ_D65) -> OKLab {
+pub fn xyz_d65_to_oklab(xyz: XyzD65) -> OKLab {
     let xyz_vec = [xyz.x, xyz.y, xyz.z];
     
     // Convert XYZ to LMS
@@ -547,7 +547,7 @@ pub fn xyz_d65_to_oklab(xyz: XYZ_D65) -> OKLab {
 }
 
 /// Convert OKLab to XYZ D65
-pub fn oklab_to_xyz_d65(oklab: OKLab) -> XYZ_D65 {
+pub fn oklab_to_xyz_d65(oklab: OKLab) -> XyzD65 {
     let lab_vec = [oklab.l, oklab.a, oklab.b];
     
     // Convert to LMS
@@ -559,7 +559,7 @@ pub fn oklab_to_xyz_d65(oklab: OKLab) -> XYZ_D65 {
     // Convert to XYZ
     let xyz = multiply_v3_m3x3(lms, LMS_TO_XYZ_M);
     
-    XYZ_D65 {
+    XyzD65 {
         x: xyz[0],
         y: xyz[1],
         z: xyz[2],
@@ -704,7 +704,7 @@ fn is_percentage(n: f32) -> bool {
 }
 
 /// Force a hex value to have 2 characters
-fn pad2(c: &str) -> String {
+pub fn pad2(c: &str) -> String {
     if c.len() == 1 {
         format!("0{}", c)
     } else {
@@ -713,23 +713,18 @@ fn pad2(c: &str) -> String {
 }
 
 /// Replace a decimal with its percentage value
-fn convert_to_percentage(n: f32) -> String {
-    if n <= 1.0 {
-        format!("{}%", n * 100.0)
-    } else {
-        format!("{}", n)
-    }
+pub fn convert_to_percentage(n: f32) -> String {
+    format!("{}%", (n * 100.0).round())
 }
 
 /// Converts a decimal to a hex value
-fn convert_decimal_to_hex(d: f32) -> String {
-    ((d * 255.0).round() as u32).to_string()
+pub fn convert_decimal_to_hex(d: f32) -> String {
+    format!("{:02x}", (d * 255.0).round() as i32)
 }
 
 /// Converts a hex value to a decimal
-fn convert_hex_to_decimal(h: &str) -> f32 {
-    let decimal = u32::from_str_radix(h, 16).unwrap_or(0);
-    decimal as f32 / 255.0
+pub fn convert_hex_to_decimal(h: &str) -> f32 {
+    i32::from_str_radix(h, 16).unwrap_or(0) as f32 / 255.0
 }
 
 /// Convert RGB to CMYK

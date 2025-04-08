@@ -4,8 +4,8 @@
   "license": "MIT",
   "scripts": {
     "test": "cargo test",
-    "build:examples": "cargo run --example svg_conversion",
-    "view:examples": "open freedraw/examples/view.html"
+    "build": "cargo build",
+    "demo": "cd demo && trunk serve --port 8250 --open"
   },
   "devDependencies": {
     "@semantic-release/commit-analyzer": "13.0.1",
