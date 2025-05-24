@@ -23,7 +23,7 @@ path = "src/lib.rs"
 regex = "1.9.1"
 lazy_static = "1.4.0"
 rand = "0.8.5"
-peniko = "0.3.1"
+peniko = "0.4.0"
 
 
 [workspace]

@@ -18,3 +18,11 @@ pub fn from_peniko_color(color: &Color) -> BigColor {
     let rgba = color.to_rgba8();
     BigColor::from_rgb(rgba.r, rgba.g, rgba.b, rgba.a as f32 / 255.0)
 } 
+
+/// Converts a string to a peniko::Color
+/// 
+/// This allows importing colors from the peniko ecosystem into BigColor
+/// for advanced color manipulation.
+pub fn get_peniko_color(color: &str) -> Color {
+    to_peniko_color(&BigColor::new(color))
+}
