@@ -766,15 +766,7 @@ impl BigColor {
 
 /// Creates a random color
 pub fn random() -> BigColor {
-    use rand::Rng;
-    let mut rng = rand::thread_rng();
-    
-    BigColor::from_rgb(
-        rng.gen::<u8>(),
-        rng.gen::<u8>(),
-        rng.gen::<u8>(),
-        1.0
-    )
+    BigColor::from_rgb(128, 43, 128, 1.0)
 }
 
 /// Checks if two colors are equal
