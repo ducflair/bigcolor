@@ -12,7 +12,7 @@ use std::fmt;
 use color_space::*;
 use parse::*;
 use crate::accessibility::{get_contrast_color as get_contrast_color_impl, get_contrast_ratio as get_contrast_ratio_impl};
-pub use peniko;
+pub use color;
 
 /// BigColor struct represents a color with various formats
 /// Using OKLCH as the foundation
