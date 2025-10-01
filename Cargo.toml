@@ -22,6 +22,9 @@ path = "src/lib.rs"
 [dependencies]
 regex = "1.9.1"
 lazy_static = "1.4.0"
+color = "0.3.2"
+
+[dev-dependencies]
 peniko = "0.4.0"
 
 

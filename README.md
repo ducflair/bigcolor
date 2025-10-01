@@ -127,19 +127,19 @@ fn main() {
 }
 ```
 
-## Peniko Integration
+## `color` crate integration
 
 ```rust
 use bigcolor::{BigColor, conversion};
-use peniko::Color as PenikoColor;
+use color::AlphaColor;
 
 fn main() {
     // Convert from BigColor to peniko::Color
     let big_color = BigColor::new("#1a6ef5");
     let peniko_color = conversion::to_peniko_color(&big_color);
     
-    // Convert from peniko::Color to BigColor
-    let peniko_red = PenikoColor::from_rgb8(255, 0, 0);
+    // Convert from color::AlphaColor<Srgb> to BigColor
+    let peniko_red = AlphaColor::from_rgb8(255, 0, 0);
     let big_red = conversion::from_peniko_color(&peniko_red);
     
     println!("Original: {}", big_color.to_hex_string(false));
